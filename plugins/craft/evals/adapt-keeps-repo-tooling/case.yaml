@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: adapt-keeps-repo-tooling
+description: "An existing repo with ESLint, Jest and its own layered layout; craft must keep them and must not bring in Biome, Vitest or Feature-Sliced Design."
+tags: [adapt, calibration]
+context:
+  scaffold_script: fixture.sh

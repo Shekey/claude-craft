@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: route-tests
+description: "A tests request takes the tests path: names the clock as the blocker, pins behaviour, then edge cases, in the repo's runner."
+tags: [router, tests]
+context:
+  scaffold_script: fixture.sh
