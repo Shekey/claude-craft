@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: assess-finds-design-problems
-description: A screen with mixed responsibilities and dishonest state; assess must find the known design problems.
+description: "A screen with mixed responsibilities and dishonest state; assess must find the known design problems."
 tags: [architect, calibration]
 context:
   scaffold_script: fixture.sh
