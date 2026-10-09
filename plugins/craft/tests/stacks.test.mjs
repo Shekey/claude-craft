@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
-import { detectStacks } from "../hooks/lib.mjs";
-import { makeRepo, run } from "./helpers.mjs";
+import { detectStacks, PACKS } from "../hooks/lib.mjs";
+import { hooks, makeRepo, run } from "./helpers.mjs";
 
 const stacksOf = (files) => detectStacks(makeRepo(files)).map(({ stack, dirs, pack }) => ({ stack, dirs, pack }));
 
@@ -95,4 +97,8 @@ test("improve mode defaults to fix", () => {
   const repo = makeRepo({ "package.json": {} });
   const context = JSON.parse(run("session-start.mjs", { cwd: repo, env: { CLAUDE_PROJECT_DIR: repo } }).out).hookSpecificOutput.additionalContext;
   assert.match(context, /Improve mode: fix/);
+});
+
+test("every pack the detector names exists", () => {
+  for (const pack of Object.values(PACKS)) assert.ok(existsSync(join(hooks, "..", "stacks", pack)), pack);
 });
