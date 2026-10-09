@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, posix } from "node:path";
-import { readInput, repoContext, sh } from "./lib.mjs";
+import { MARKERS, readInput, repoContext, sh } from "./lib.mjs";
 
 const MAX_ATTEMPTS = 3;
 const CODE = /\.(m?[jt]sx?|c[jt]s|vue|svelte|astro|json|jsonc|css|scss|less|html|graphql|kts?|java|gradle|py|pyi|go|rs)$/i;
@@ -14,13 +14,6 @@ const DEPCRUISE_CONFIGS = [".dependency-cruiser.cjs", ".dependency-cruiser.js", 
 const DEPCRUISE_BASELINE = ".dependency-cruiser-known-violations.json";
 const ARCH_SCRIPTS = ["lint:arch", "check:arch", "arch", "depcruise", "lint:deps", "deps:check"];
 const JEST_CONFIGS = ["jest.config.js", "jest.config.ts", "jest.config.cjs", "jest.config.mjs", "jest.config.json"];
-const MARKERS = {
-  node: ["package.json"],
-  gradle: ["settings.gradle.kts", "settings.gradle", "gradlew"],
-  python: ["pyproject.toml"],
-  go: ["go.mod"],
-  rust: ["Cargo.toml"],
-};
 const PREFERRED = [
   [/\.(kts?|java|gradle)$/i, "gradle"],
   [/\.pyi?$/i, "python"],

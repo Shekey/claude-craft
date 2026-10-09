@@ -28,7 +28,7 @@ Per chosen package:
 - Duplication of a concept across modules.
 
 ### 3. Read the central units
-Run `hotspots <package> 15`. The score combines size, 6-month churn, state hooks and fan-in, and the first line gives a suggested depth that grows with the package's size. Read that many units per package (`--depth N` overrides), preferring entry points (screens, routes, controllers, ViewModels) and the main user flows, and also any unit scoring at least 60% of the top score. Read each one end to end, plus the local modules it imports. Apply every rule in [design.md](design.md) to it, including its "Not a finding" section. Note evidence with line ranges.
+Run `hotspots <package> 15`. The score combines size, 6-month churn, state hooks and fan-in, and the first line gives a suggested depth that grows with the package's size. Read that many units per package (`--depth N` overrides), preferring entry points (screens, routes, controllers, ViewModels) and the main user flows, and also any unit scoring at least 60% of the top score. Read each one end to end, plus the local modules it imports. Apply every rule in [design.md](design.md) to it, including its "Not a finding" section, plus the design signals of the package's stack pack (`repo.mjs stack`). Note evidence with line ranges.
 
 Bug pass: while reading, also record anything that looks like a real defect (a reset or invalidation that one code path ignores, a fallback to a fake value such as 0,0 or an empty id, an error swallowed, a stale closure). These are `bug` findings with severity by impact, never `minor`. If you cannot confirm it from the code you read, say "suspected" in the Problem and what to check.
 

@@ -11,7 +11,7 @@ If the conventions file exists, read it and trust it. Re-check only the parts th
 
 Otherwise discover, then write the conventions file (max ~50 lines, facts only):
 
-- **Stack and tooling**: language versions, package manager (from the lockfile), formatter, linter, type checker, test runner, the scripts or tasks that run them.
+- **Stack and tooling**: the stacks from `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" stack` and where each lives, language versions, package manager (from the lockfile), formatter, linter, type checker, test runner, the scripts or tasks that run them.
 - **Architecture**: the style in use (feature folders, FSD, layered, modules, hexagonal, none), the folder map, the direction of dependencies, where business logic lives versus UI or I/O, any boundary tool already configured. If it hurts, note the pain in one line; propose `craft:architect` in a plan only when the user's task needs it.
 - **Patterns**: state management, data fetching, DI style, error handling, validation, logging.
 - **Naming**: files, components, functions, tests, branches.
@@ -41,7 +41,11 @@ If they do not match, pin the real commands. `fix` runs first and its failures a
 }
 ```
 
-Options: `lean` (lite, full, ultra, off), `tests` (`related` or `full`), `fix`, `verify` (array of commands, or `false` to disable the check for this repo).
+Options: `lean` (lite, full, ultra, off), `tests` (`related` or `full`), `improve` (`fix`, `record`, `off`), `fix`, `verify` (array of commands, or `false` to disable the check for this repo).
+
+Improve mode: ask once whether this is the user's own repo or someone else's (a client or agency project), with AskUserQuestion when available. For someone else's repo set `"improve": "record"`, so craft records improvements in the backlog instead of changing code the task didn't ask for. For the user's own repo leave it out (`fix` is the default). When nobody can answer, leave it out and say so in one line.
+
+Stack pack: if `repo.mjs stack` names a pack for the stack you are adapting to, read it. Where the repo's own tools, layout or patterns differ from the pack, write the repo's choice in the conventions; it wins. Never add the pack's suggested tools to an existing repo unasked.
 
 Finally run `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" mark` to record the commit the conventions describe.
 

@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, join, posix } from "node:path";
 
 export async function readInput() {
   if (process.stdin.isTTY) return {};
@@ -94,4 +94,63 @@ export function repoContext(cwd) {
     config: { ...readJsonFile(join(cacheDir, "craft.json")), ...readJsonFile(join(repoDir, "craft.json")) },
     state: readJsonFile(join(cacheDir, "state.json")),
   };
+}
+
+export const MARKERS = {
+  node: ["package.json"],
+  gradle: ["settings.gradle.kts", "settings.gradle", "gradlew"],
+  python: ["pyproject.toml"],
+  go: ["go.mod"],
+  rust: ["Cargo.toml"],
+};
+
+export const PACKS = {
+  "react-native": "react-native.md",
+  next: "nextjs.md",
+  react: "react.md",
+  nestjs: "nestjs.md",
+  kotlin: "kotlin-java.md",
+  java: "kotlin-java.md",
+};
+
+const JVM_BUILD = new Set(["settings.gradle.kts", "settings.gradle", "build.gradle.kts", "build.gradle", "pom.xml"]);
+const IGNORED = /(^|\/)(node_modules|vendor|dist|build|\.next|\.expo|fixtures?|__fixtures__|evals?|examples?|testdata)\//;
+
+function nodeStack(pkg) {
+  const deps = { ...pkg.peerDependencies, ...pkg.devDependencies, ...pkg.dependencies };
+  if ("expo" in deps || "react-native" in deps) return "react-native";
+  if ("next" in deps) return "next";
+  if ("@nestjs/core" in deps) return "nestjs";
+  if ("react" in deps) return "react";
+  return "node";
+}
+
+export function detectStacks(root) {
+  const listed = sh("git ls-files -co --exclude-standard", root);
+  const files = listed.ok ? listed.out.split("\n").filter((f) => f && !IGNORED.test(f)) : [];
+  const dirOf = (file) => (posix.dirname(file) === "." ? "" : posix.dirname(file));
+  const inside = (file, dir) => !dir || file.startsWith(`${dir}/`);
+  const stacks = new Map();
+  const add = (stack, dir) => {
+    if (!stacks.has(stack)) stacks.set(stack, []);
+    if (!stacks.get(stack).includes(dir)) stacks.get(stack).push(dir);
+  };
+
+  for (const file of files.filter((f) => posix.basename(f) === "package.json")) {
+    const dir = dirOf(file);
+    const pkg = readJsonFile(join(root, file));
+    if (pkg.workspaces || existsSync(join(root, dir, "pnpm-workspace.yaml"))) continue;
+    add(nodeStack(pkg), dir);
+  }
+
+  const jvmDirs = [...new Set(files.filter((f) => JVM_BUILD.has(posix.basename(f))).map(dirOf))].sort((a, b) => a.length - b.length);
+  const jvmRoots = jvmDirs.filter((dir, i) => !jvmDirs.slice(0, i).some((parent) => inside(dir, parent)));
+  for (const dir of jvmRoots) {
+    const own = files.filter((f) => inside(f, dir));
+    const build = own.filter((f) => JVM_BUILD.has(posix.basename(f))).map((f) => readFileSync(join(root, f), "utf8")).join("\n");
+    const kotlin = own.some((f) => f.endsWith(".kt")) || (!own.some((f) => f.endsWith(".java")) && /kotlin/i.test(build));
+    add(kotlin ? "kotlin" : "java", dir);
+  }
+
+  return [...stacks].map(([stack, dirs]) => ({ stack, dirs: dirs.sort(), pack: PACKS[stack] ?? null }));
 }
