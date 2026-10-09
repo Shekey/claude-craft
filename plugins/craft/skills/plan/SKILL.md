@@ -19,7 +19,7 @@ Changes:
 Interface: new or changed public signatures, nothing else
 Tests: what gets tested and where
 Risks / open questions: only real ones
-While here: small fixes in touched files (own commit) and backlog items, or none
+While here: small fixes in touched files (own commit) and backlog items from the files and modules you read; "none" only after looking
 Commits: the planned commit split
 ```
 
