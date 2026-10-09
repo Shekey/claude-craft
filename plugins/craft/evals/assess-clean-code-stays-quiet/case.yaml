@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: assess-clean-code-stays-quiet
+description: The same feature built cleanly; assess must not invent high or medium findings.
+tags: [architect, calibration]
+context:
+  scaffold_script: fixture.sh

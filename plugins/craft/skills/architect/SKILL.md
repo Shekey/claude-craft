@@ -1,54 +1,98 @@
 ---
 name: architect
-description: Use when the user wants to improve, restructure or set up a codebase's architecture, when a refactor changes module or folder structure, or when starting a project large enough to need one. Assesses with evidence, picks the smallest fitting target, migrates in safe steps and enforces boundaries.
-argument-hint: "[assess | plan | enforce] [path]"
+description: Use when the user wants to assess, improve, restructure or set up a codebase's architecture or code design, asks what is wrong with a codebase or a screen, wants to see or continue the architecture backlog, or when a refactor changes module or folder structure. Finds structure and design problems with evidence, keeps a findings backlog the user picks from, and works through it in safe, enforced iterations.
+argument-hint: "[assess [paths] [--depth N] | plan <IDs> | status | next | enforce]"
 ---
 
 # Architecture
 
-Work through these phases in order. `$ARGUMENTS` may ask for only one of them. Present phases 1–2 as the plan and wait for approval before changing code.
+`$ARGUMENTS` picks the mode. With no argument: `status` if a backlog exists for this repo, otherwise `assess`.
 
-## 1. Assess with evidence
+Helper (run from the repo root): `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" <paths | packages | hotspots <dir> [limit]>`. `paths` gives `findingsFile` (the backlog) and `conventions`, both in craft's per-repo cache outside the repo. If the helper cannot run, do the same with `git ls-files`, `git log` and Glob.
 
-Measure before judging. Use temporary tools via `npx -y` / `uvx`; do not add dependencies for this.
+Design rules: [design.md](design.md). Targets and enforcement: [reference.md](reference.md).
 
-- **Cycles**: TS/JS `npx -y madge --circular --extensions ts,tsx,js,jsx <src>`; Python `uvx pydeps --show-cycles --no-output <pkg>`; Go and Rust compilers already forbid package cycles.
-- **Hotspots**: the largest files and the most-changed files (`git log --since=6.months --name-only --format= | sort | uniq -c | sort -rn | head -20`). Large and frequently changed together is where structure hurts.
-- **Wrong-way dependencies**: UI importing data access directly, shared code importing features, domain code importing framework or database code.
-- **Duplication**: the same concept implemented in several places.
+## assess
 
-Report the top 3–5 pains, each with file references and the cost it causes (bugs, slow changes, merge conflicts, untestable code). If nothing hurts, say so and stop. Architecture work needs a reason.
+### 1. Scope
+Run `packages`. With two or more packages or apps, ask which to assess with AskUserQuestion (multiSelect), unless `$ARGUMENTS` already names paths:
+- up to 4 packages: one question, one option each;
+- 5 to 16: split across up to 4 questions grouped by kind (apps, shared packages, backend, native);
+- more: offer the 4 with the most code files and let the user type others under "Other".
+A single package or app is assessed straight away.
 
-## 2. Choose the smallest target that removes those pains
+### 2. Measure structure
+Per chosen package:
+- Cycles: TS/JS `npx -y madge --circular --extensions ts,tsx,js,jsx <dir>`; Python `uvx pydeps --show-cycles --no-output <pkg>`. Skip if the tool cannot run and say so.
+- Wrong-way imports: UI importing data access directly, shared code importing features, domain code importing framework or database code. In a monorepo also: an app importing another app, a package importing an app, deep imports into a package's internals instead of its public entry.
+- Duplication of a concept across modules.
 
+### 3. Read the central units
+Run `hotspots <package> 15`. Pick the central units, default 3 per package (`--depth N` changes it): prefer entry points (screens, routes, controllers, ViewModels) and the main user flows, ranked by the hotspot score. Read each one end to end, plus the local modules it imports. Apply every rule in [design.md](design.md) to it, including its "Not a finding" section. Note evidence with line ranges.
+
+### 4. Write findings
+Each finding:
+
+```
+## A3 · high · design · D3 · todo
+Files: app/add-item.tsx:47-49, 147
+Problem: photo, existing and removePhoto allow impossible combinations; the upload payload is decided by flag checks.
+Fix: one Photo union (none | saved | new) with the payload derived from it.
+Effort: S · Depends on: A1 · Batch: add-item state model
+```
+
+- Kind is `design`, `structure`, `bug` or `minor` (definitions in design.md). Rule IDs: D1–D10 for design and minor, `S` for structure, none for bugs. Label honestly; a severity or kind inflated to make a finding look important is a calibration failure.
+- Group findings into batches: each batch is one coherent change that can ship on its own (usually one unit or one theme), ordered so dependencies come first.
+- Minor findings sit in their own group and are never part of a recommended batch.
+- No evidence, no finding. Calibrate with "Not a finding"; an empty list for a package is a valid result.
+
+### 5. Backlog
+Save to `findingsFile`, newest assessment first:
+
+```
+# Findings · <repo key>
+Assessed: <date> at <short sha> · Scope: <packages> · Depth: <N>
+```
+
+followed by the findings. If the file already exists, merge: keep IDs and statuses of findings that still apply, mark ones whose problem is gone as `done (gone at <sha>)`, append new ones with the next free ID. Never renumber.
+
+### 6. Report and pick
+Your reply lists every finding (ID, severity, kind, one line, files), grouped by batch, minor group last, then a one-line "Guardrails" note if tests, linting or boundary tools are missing. Then AskUserQuestion (multiSelect) with up to 4 recommended batches: high severity first, then unblocked, then small effort. Label: the batch name. Description: its IDs and effort. The user can type other IDs under "Other". Then go to `plan` with the chosen IDs.
+
+When AskUserQuestion is not available or not answered, end with the list and: "Pick with /craft:architect plan <IDs>".
+
+## plan <IDs>
+1. Read the chosen findings from the backlog and re-check their evidence against the current code.
+2. If they change module or folder structure, choose the target first (section Targets) and include it.
+3. Present the plan in the craft:plan shape, covering only the chosen IDs. Wait for approval.
+4. Migrate following craft:refactor: characterization tests first, one batch per commit or a few small commits per batch, verify after each.
+5. After each batch is committed, set its findings to `done (<short sha>)` in the backlog. If the work reveals a new problem, add it as a new finding instead of widening the batch.
+6. If a target architecture was introduced or extended, update the `## Architecture` section in the conventions file and run `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" mark`.
+
+## status
+Read the backlog. Show counts per status and severity, the remaining batches in order, and the date and commit of the last assessment. Suggest re-assessing if that commit is far behind HEAD.
+
+## next
+Recommend up to 4 batches from the backlog (same ordering as in assess, step 6) and ask with AskUserQuestion (multiSelect). Then `plan` the chosen ones.
+
+## Targets
 Size first:
 - **Small** (one team, a handful of features): plain feature folders. No layers beyond that.
 - **Medium and up**: the defaults below.
 
-Defaults by kind (details and rules in [reference.md](reference.md)):
+Defaults (rules in [reference.md](reference.md)):
 - **Frontend web and React Native**: Feature-Sliced Design v2.1.
-- **Backend**: feature modules (vertical slices) with a public entry per module. Add ports and adapters only around real external I/O (database, queues, third-party APIs) where you need to swap or fake them.
-- **Android / Kotlin**: one module or package per feature with `ui` and `data`; add `domain` only for logic shared across screens.
-- **Existing repo with a working architecture**: keep it and fix only the pains. Do not migrate to a default just because it is the default.
+- **Backend**: feature modules with a public entry each; ports and adapters only around real external I/O you need to swap or fake.
+- **Android / Kotlin**: a module or package per feature with `ui` and `data`; `domain` only for logic shared across screens.
+- **Monorepo**: apps never import apps; packages never import apps; apps use packages only through their public entry.
+- **Existing repo with a working architecture**: keep it and fix the findings. Do not migrate to a default because it is the default.
 
-State the target in the plan: the folder map, the dependency rules in one line each, and what moves first.
+Record the target in the `## Architecture` section of the conventions file: style, folder map, dependency rules, enforcement command, migration status per area.
 
-## 3. Record the decision
+Write a decision record only for a choice that is expensive to reverse or affects other teams (splitting a service, changing the database, a public API contract): one page in `docs/adr/NNNN-title.md` with Context, Decision, Consequences. Ask first.
 
-Write an `## Architecture` section in the conventions file (path from the craft repo context): target style, folder map, dependency rules, enforcement tool and command, migration status (done / in progress / not started per area). Run `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" mark` after.
-
-Write a decision record only for a choice that is expensive to reverse or affects other teams (splitting a service, changing the database, a public API contract): one page in `docs/adr/NNNN-title.md` with Context, Decision, Consequences. Ask first. Everything else stays in the conventions file.
-
-## 4. Migrate in safe steps
-
-- Characterization tests around the area before moving it (see `craft:refactor`).
-- Move one slice or module per commit. The app builds and tests pass after every commit.
-- Move files first, change behavior never. Use the language tooling (IDE refactors, `ts-morph`, codemods) to update imports rather than hand edits across many files.
-- New code follows the target immediately; old code moves when touched or in planned steps.
-
-## 5. Enforce the boundaries
-
-Set up the tool for the stack. Commands and config examples are in [reference.md](reference.md); dependency-cruiser templates are in `${CLAUDE_PLUGIN_ROOT}/templates/`.
+## enforce
+Set up the boundary tool for the stack; commands and config are in [reference.md](reference.md), dependency-cruiser templates in `${CLAUDE_PLUGIN_ROOT}/templates/`.
 
 | Stack | Tool |
 |---|---|
@@ -59,4 +103,6 @@ Set up the tool for the stack. Commands and config examples are in [reference.md
 | Go | `internal/` packages and depguard in golangci-lint |
 | Rust | crate boundaries in a workspace, `pub(crate)` by default |
 
-Record existing violations as a baseline so only new violations fail, and shrink the baseline as migration proceeds. Add a package script (`lint:arch`) or keep the config at the root so the craft verify hook runs the check automatically. Confirm by running verify in plan mode: `echo '{}' | CRAFT_VERIFY=plan node "${CLAUDE_PLUGIN_ROOT}/hooks/verify.mjs"`.
+Record existing violations as a baseline so only new ones fail, and shrink it as batches land. Add a `lint:arch` script or keep the config at the root so the craft verify hook runs the check. Confirm with `echo '{}' | CRAFT_VERIFY=plan node "${CLAUDE_PLUGIN_ROOT}/hooks/verify.mjs"`.
+
+Design rules (D1–D10) are not enforceable by import tools; the reviewer agent checks them on every review.

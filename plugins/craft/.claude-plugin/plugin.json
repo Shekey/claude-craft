@@ -1,17 +1,29 @@
 {
   "name": "craft",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Language-agnostic engineering discipline: plan first, adapt to the repo, lean code, simple interfaces, no noise comments, verified before done, human-style commits.",
-  "author": { "name": "Ajdin" },
+  "author": {
+    "name": "Ajdin"
+  },
   "license": "MIT",
-  "keywords": ["clean-code", "workflow", "quality", "hooks", "lean"],
-  "dependencies": ["code-simplifier"],
+  "keywords": [
+    "clean-code",
+    "workflow",
+    "quality",
+    "hooks",
+    "lean"
+  ],
   "userConfig": {
     "lean_level": {
       "type": "string",
       "title": "Default lean level",
       "description": "How hard Claude pushes for minimal code: lite suggests, full enforces, ultra deletes first and challenges requirements, off disables the ladder.",
-      "options": ["lite", "full", "ultra", "off"],
+      "options": [
+        "lite",
+        "full",
+        "ultra",
+        "off"
+      ],
       "default": "full"
     }
   }

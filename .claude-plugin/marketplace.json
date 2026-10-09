@@ -10,13 +10,16 @@
     {
       "name": "craft",
       "source": "./plugins/craft",
-      "description": "Language-agnostic engineering discipline: plan first, adapt to the repo, lean code, simple interfaces, no noise comments, verified before done, human-style commits."
+      "description": "Language-agnostic engineering discipline: plan first, adapt to the repo, lean code, simple interfaces, no noise comments, verified before done, human-style commits.",
+      "dependencies": [
+        "code-simplifier"
+      ]
     },
     {
       "name": "code-simplifier",
       "source": {
         "source": "git-subdir",
-        "url": "anthropics/claude-plugins-official",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
         "path": "plugins/code-simplifier"
       },
       "description": "Anthropic's code-simplifier agent, installed automatically as a craft dependency."

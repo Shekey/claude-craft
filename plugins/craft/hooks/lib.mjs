@@ -90,6 +90,7 @@ export function repoContext(cwd) {
     conventionsShared,
     configFile: existsSync(join(repoDir, "craft.json")) ? join(repoDir, "craft.json") : join(cacheDir, "craft.json"),
     stateFile: join(cacheDir, "state.json"),
+    findingsFile: join(cacheDir, "findings.md"),
     config: { ...readJsonFile(join(cacheDir, "craft.json")), ...readJsonFile(join(repoDir, "craft.json")) },
     state: readJsonFile(join(cacheDir, "state.json")),
   };

@@ -24,7 +24,7 @@ Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mj
 | Principles | Injected at every session start: repo conventions first, the lean ladder, interface and comment rules, definition of done |
 | `/craft:plan` | A plan for every task; waits for approval unless trivial |
 | `/craft:adapt` | Existing repo: maps the architecture and verify commands into craft's per-repo cache (see below) |
-| `/craft:architect` | Assess with evidence, pick the smallest fitting target (FSD for frontends, feature modules for backends), migrate in steps, enforce boundaries with a baseline |
+| `/craft:architect` | Assess structure and code design, keep a findings backlog you pick from, migrate in steps, enforce boundaries with a baseline |
 | `/craft:greenfield` | New project: the boring standard toolchain per language (pnpm + Biome + Vitest for TS) |
 | `/craft:refactor` | Characterization tests first, small behavior-preserving commits, then code-simplifier and the reviewer |
 | `/craft:commit` | Commits in the repo's own style, no AI trailers |
@@ -62,6 +62,30 @@ If a repo contains `.claude/conventions.md` or `.claude/craft.json` (because a t
 | Go | `internal/` + depguard | yes, when `.golangci.*` exists |
 
 dependency-cruiser needs a `typescript` package below version 7; on TypeScript 7 repos keep `typescript@^6` as a dev dependency for it. Verify fails if it analyses 0 modules, so a silently broken check can't pass.
+
+## Design checklist and the findings backlog
+
+craft checks code design, not only structure. One checklist (`skills/architect/design.md`, rules D1–D10: single responsibility, one state model, no impossible states, derive don't sync, side effects at the edges, thin entry points, one mapping, domain logic in its domain, cross-cutting policy in one place, visible invariants) is used while writing code, by the reviewer on every diff, and by `/craft:architect assess`. A "Not a finding" section keeps it from inventing problems in clean code.
+
+Rule order: correctness and guardrails, then design, then lean. Lean decides scope, never how responsibilities are split.
+
+`/craft:architect` works as a backlog you pick from:
+
+| Command | What it does |
+|---|---|
+| `assess [paths] [--depth N]` | In a monorepo, asks which packages to assess (tick-box). Measures structure, reads the 3 most central units per package end to end, writes findings with IDs, severity, kind, files, effort and batches to the repo's cache, then asks which batches to tackle |
+| `plan <IDs>` | Plans the chosen findings, migrates in steps, marks them done after each commit |
+| `status` | What is left, by severity and batch |
+| `next` | Suggests the next batches and asks with a tick-box |
+
+## Evals
+
+`plugins/craft/evals/` holds calibration cases for assess: a screen with known design problems that must be found, and the same feature built cleanly where nothing must be invented. Run them with:
+
+```bash
+cd plugins/craft
+claude plugin eval . --scaffold --trust-plugin
+```
 
 ## Lean levels
 
