@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join, posix } from "node:path";
+import { dirname, join, posix } from "node:path";
+import { fileURLToPath } from "node:url";
 import { check as checkBacklog, render as renderRoadmap, roadmap } from "./backlog.mjs";
-import { repoContext, sh } from "./lib.mjs";
+import { detectStacks, repoContext, sh } from "./lib.mjs";
 
 const CODE = /\.(m?[jt]sx?|c[jt]s|vue|svelte|astro|kts?|java|py|go|rs|swift)$/i;
 const NOISE = /(^|\/)(node_modules|dist|build|\.next|\.expo|coverage|vendor|generated|__generated__)\/|\.d\.ts$|\.min\.js$|(^|\/)(build|settings)\.gradle(\.kts)?$|\.config\.[cm]?[jt]s$/;
@@ -155,6 +156,10 @@ if (command === "paths") {
   process.stdout.write(
     `${JSON.stringify({ root, key, cacheDir, conventions, conventionsShared, configFile, stateFile, findingsFile, config, state }, null, 2)}\n`,
   );
+} else if (command === "stack") {
+  const packs = join(dirname(fileURLToPath(import.meta.url)), "..", "stacks");
+  const stacks = detectStacks(root).map((s) => ({ ...s, pack: s.pack && join(packs, s.pack) }));
+  process.stdout.write(`${JSON.stringify(stacks, null, 2)}\n`);
 } else if (command === "mark") {
   const head = sh("git rev-parse HEAD", root);
   writeState({ conventionsCommit: head.ok ? head.out.trim() : null, updatedAt: new Date().toISOString() });
@@ -180,6 +185,6 @@ if (command === "paths") {
   if (problems.length) process.stderr.write(`Backlog problems (fix with /craft:architect or edit ${context.findingsFile}):\n${problems.map((p) => `- ${p}`).join("\n")}\n\n`);
   process.stdout.write(renderRoadmap(roadmap(parsed)));
 } else {
-  process.stderr.write("Usage: repo.mjs [paths | mark | packages | hotspots <dir> [limit] | backlog [roadmap|check]]\n");
+  process.stderr.write("Usage: repo.mjs [paths | stack | mark | packages | hotspots <dir> [limit] | backlog [roadmap|check]]\n");
   process.exit(1);
 }

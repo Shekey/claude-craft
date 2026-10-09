@@ -69,6 +69,8 @@ If the units you read have no high or medium findings, say so plainly. Do not pa
 
 ## Stack signals
 
+Short signals per stack. Each stack pack in `${CLAUDE_PLUGIN_ROOT}/stacks/` adds more, with the stack's boundary tool.
+
 **React / React Native**
 - D2: five or more `useState` calls for one form or entity; a function that calls most of the same setters as an effect.
 - D4: `useEffect` that calls setters from props or loaded data; `useRef` used as a "loaded once" guard.

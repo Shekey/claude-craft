@@ -22,7 +22,10 @@ Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mj
 | Piece | What it does |
 |---|---|
 | Principles | Injected at every session start: repo conventions first, the lean ladder, interface and comment rules, definition of done |
-| `/craft:plan` | A plan for every task; waits for approval unless trivial |
+| `/craft:task` | The entry point for every task: picks the path (question, bug, tests, cleanup, feature), loads the stack pack and runs the shared tail |
+| `craft:bug` | Bug path: reproduce, failing test, root cause, fix, then the same bug elsewhere |
+| `craft:tests` | Tests path: say what blocks testing, pin current behavior, then edge cases, in the repo's own runner |
+| `/craft:plan` | A plan for every change, with a `While here` line; waits for approval unless trivial |
 | `/craft:adapt` | Existing repo: maps the architecture and verify commands into craft's per-repo cache (see below) |
 | `/craft:architect` | Assess structure and code design, keep a findings backlog you pick from, migrate in steps, enforce boundaries with a baseline |
 | `/craft:greenfield` | New project: the boring standard toolchain per language (pnpm + Biome + Vitest for TS) |
@@ -31,9 +34,41 @@ Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mj
 | `/craft:lean` | Switch level (`lite`, `full`, `ultra`, `off`), or `debt` to list every `shortcut:` marker |
 | `craft:reviewer` agent | Fresh-context review of the diff; reports only |
 | `code-simplifier` agent | Installed with craft; cleanup pass told to follow the repo's conventions over its own defaults |
-| SessionStart hook | Loads principles, the repo's conventions and the active lean level |
+| Stack packs | Rules, design signals and the boundary tool for React Native/Expo, Kotlin/Java, Next.js, React and NestJS (`plugins/craft/stacks/`) |
+| SessionStart hook | Loads principles, the repo's conventions, the detected stacks with the pack to read for each, the improve mode and the active lean level |
 | PreToolUse hook | Blocks commits and pushes with AI trailers or mentions, and staged narration comments (`// Updated…`, `// Added…`, TODO, FIXME). `shortcut:` markers are allowed |
 | Stop hook | When Claude finishes with uncommitted changes: auto-fix, then lint, types and related tests. Failures go back to Claude, up to 3 rounds |
+
+## How the pieces connect
+
+One task goes through every step in this order, and each step knows about the next:
+
+1. **Session start** (`hooks/session-start.mjs`): detects the stacks (`detectStacks` in `hooks/lib.mjs`, the same project markers verify uses), writes them to the repo's `state.json`, and tells Claude which pack to read for which folder, the improve mode and the lean level.
+2. **Router** (`/craft:task`): picks the path from the task type and loads the conventions, the stack pack for the area touched and the design checklist.
+3. **Path**: question (research rules, no edits), bug (`craft:bug`), tests (`craft:tests`), cleanup (`craft:refactor`, `craft:architect` when structure moves), feature (`craft:plan` + `craft:adapt`).
+4. **Shared tail**, the same for every path that changes code:
+   - **While here**: small fixes in files the task touches, in their own commit; anything wider goes to the findings backlog (`/craft:architect status` shows it).
+   - **Verify**: the Stop hook runs the repo's own fix, lint, type and related-test commands per stack.
+   - **Review**: `craft:reviewer` checks the diff against the design checklist and the stack pack.
+   - **Commit**: `craft:commit`, then the end line `Improved: … · Backlog: …`.
+
+`node <plugin>/hooks/repo.mjs stack` prints the detected stacks and pack paths for the current repo. A monorepo gets one entry per app, and an Expo app with a committed `android/` folder gets both the React Native and the Kotlin pack. The repo's conventions always win over a pack.
+
+## Improve each task
+
+craft leaves the code it touches a little better. The `improve` setting decides how, per repo:
+
+| Mode | What happens |
+|---|---|
+| `fix` (default) | Small, behavior-preserving fixes in files the task already changes, each in its own commit. Wider problems go to the backlog |
+| `record` | Nothing beyond the task changes; every improvement goes to the backlog. For agency and client repos you don't own |
+| `off` | No while-here step |
+
+`/craft:adapt` asks once whether a repo is yours and sets `record` for repos that aren't.
+
+## Research
+
+On the question path, and when any path needs a wide search, craft spawns read-only agents only when the question spans several independent areas: at most about 4, each with one question, a scope and `path:line` evidence. Claude re-checks the cited lines before repeating any claim. High-stakes work (security, data loss, migrations) can get a second, independent agent on the same question.
 
 ## Per-repo memory, outside your repos
 
@@ -41,7 +76,7 @@ craft keeps what it learns about each repo in `~/.claude/craft/repos/<repo-key>/
 
 - `conventions.md`: stack, architecture, patterns, naming, tests, commit style
 - `craft.json`: per-repo settings (lean level, tests, custom verify commands)
-- `state.json`: the commit the conventions describe
+- `state.json`: the commit the conventions describe and the detected stacks
 
 The key comes from the git remote (`git@github.com:Shekey/pijaca.git` → `github.com-shekey-pijaca`), so every clone and worktree of a repo shares one entry. Repos without a remote use the folder name plus a path hash. Set `CRAFT_HOME` to move the cache.
 
@@ -91,12 +126,22 @@ Rule order: correctness and guardrails, then design, then lean. Lean decides sco
 
 ## Evals
 
-`plugins/craft/evals/` holds calibration cases for assess: a screen with known design problems that must be found, and the same feature built cleanly where nothing must be invented. Run them with:
+`plugins/craft/evals/` holds:
+
+- calibration cases for assess: a screen with known design problems that must be found, and the same feature built cleanly where nothing must be invented;
+- router cases, one per task type (`route-*`): a question makes no edits, a bug gets a failing test before the fix and the same bug found elsewhere, tests name the clock as the blocker, cleanup pins behavior first, a feature is planned and mirrors the CLI;
+- `adapt-keeps-repo-tooling`: a repo with ESLint, Jest and a layered layout keeps them, with no Biome, Vitest or FSD brought in;
+- `improve-separate-commit`: touched-file fixes land in their own commit and a far-away problem goes to the backlog untouched.
+
+Run them with:
 
 ```bash
 cd plugins/craft
-claude plugin eval . --scaffold --trust-plugin
+claude plugin eval . --scaffold --trust-plugin --allow-tools Bash Edit Write
+claude plugin eval . --scaffold --trust-plugin --allow-tools Bash Edit Write --case 'route-*' --runs 3
 ```
+
+Bash runs inside the eval sandbox, which needs `bubblewrap` and `socat` on Linux.
 
 ## Lean levels
 
@@ -143,12 +188,13 @@ echo '{}' | CRAFT_VERIFY=plan node ~/.claude/plugins/cache/<...>/craft/hooks/ver
 {
   "lean": "full",
   "tests": "related",
+  "improve": "record",
   "fix": ["pnpm biome check --write ."],
   "verify": ["pnpm lint", "pnpm typecheck", "pnpm vitest related --run --passWithNoTests"]
 }
 ```
 
-All keys are optional. `verify` replaces auto-detection entirely (`false` disables the check for the repo). `tests: "full"` runs the whole suite instead of related tests. `CRAFT_VERIFY=off` disables it for one session.
+All keys are optional. `improve` is `fix` (default), `record` or `off`. `verify` replaces auto-detection entirely (`false` disables the check for the repo). `tests: "full"` runs the whole suite instead of related tests. `CRAFT_VERIFY=off` disables it for one session.
 
 ## Development
 
@@ -156,7 +202,7 @@ All keys are optional. `verify` replaces auto-detection entirely (`false` disabl
 node --test plugins/craft/tests/*.test.mjs
 ```
 
-The tests build small throwaway repos for each stack (pnpm, yarn, npm, Gradle, Python, monorepo), and cover the commit guard and the backlog parser. CI runs them on every push. Evals live in `plugins/craft/evals` (`claude plugin eval plugins/craft --scaffold --trust-plugin`).
+The tests build small throwaway repos for each stack (pnpm, yarn, npm, Gradle, Python, monorepo), check stack detection (Expo, Gradle Kotlin and Java, Maven, Next, React, NestJS, plain Node, an Expo app with `android/`, a monorepo), and cover the commit guard and the backlog parser. CI runs them on every push. Evals live in `plugins/craft/evals` (see Evals above).
 
 ## Turn off Claude Code's own commit attribution
 

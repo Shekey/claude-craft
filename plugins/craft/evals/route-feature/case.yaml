@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: route-feature
+description: "A feature request takes the feature path: a plan, code that mirrors the existing CLI, a test in the repo's runner."
+tags: [router, feature]
+context:
+  scaffold_script: fixture.sh

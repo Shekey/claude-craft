@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: improve-separate-commit
+description: "A feature in a messy file; small fixes in that file land in their own commit, and the problem in a far-away file goes to the backlog untouched."
+tags: [improve]
+context:
+  scaffold_script: fixture.sh

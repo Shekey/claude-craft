@@ -10,7 +10,7 @@
     {
       "name": "craft",
       "source": "./plugins/craft",
-      "description": "Language-agnostic engineering discipline: plan first, adapt to the repo, lean code, simple interfaces, no noise comments, verified before done, human-style commits.",
+      "description": "Language-agnostic engineering discipline: a path per task type, adapt to the repo and its stack, improve what you touch, lean code, verified before done, human-style commits.",
       "dependencies": [
         "code-simplifier"
       ]
