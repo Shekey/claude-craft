@@ -1,5 +1,7 @@
 # Craft principles
 
+First step on every task, before any other tool call: invoke the craft:task skill. It picks the path for the task type; skipping it skips the steps that make the work correct.
+
 ## Priority
 1. The repo's existing conventions: architecture, folder layout, naming, patterns, lint and format config, commit style.
 2. The project's CLAUDE.md and the repo's craft conventions file (path in the craft repo context below).
