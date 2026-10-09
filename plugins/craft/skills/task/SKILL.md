@@ -22,6 +22,8 @@ Then load that path's skill with the Skill tool before reading further or editin
 | cleanup | refactor, simplify, rename, restructure, no behavior change | `craft:refactor`; `craft:architect` when modules or folders move |
 | feature | new or changed behavior | `craft:plan`, then implement following `craft:adapt`, with a test for the new behavior |
 
+A feature needs a test for the new behavior even when it sits in an entry point that is awkward to test (a CLI, a route, a screen): test it at that boundary (spawn the CLI, call the handler, render the screen) or take the seam from `craft:tests`. "The helper it calls is already tested" is not a test of the feature.
+
 When the user says not to wait for approval, still write the plan; just don't stop for an answer.
 
 When a request mixes types, do them in this order, each with its own commits: bug, tests, cleanup, feature. A question that ends in "so change it" becomes the matching path once the answer is given.
