@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: assess-monorepo-slash-command
+description: A monorepo assessed through the slash-command path argument; the report must follow the contract and surface the seeded bug.
+tags: [architect, monorepo, contract]
+context:
+  scaffold_script: fixture.sh

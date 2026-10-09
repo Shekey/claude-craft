@@ -1,10 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
+import { check as checkBacklog, render as renderRoadmap, roadmap } from "./backlog.mjs";
 import { repoContext, sh } from "./lib.mjs";
 
 const CODE = /\.(m?[jt]sx?|c[jt]s|vue|svelte|astro|kts?|java|py|go|rs|swift)$/i;
 const NOISE = /(^|\/)(node_modules|dist|build|\.next|\.expo|coverage|vendor|generated|__generated__)\/|\.d\.ts$|\.min\.js$|(^|\/)(build|settings)\.gradle(\.kts)?$|\.config\.[cm]?[jt]s$/;
 const TEST = /(\.|_)(test|spec)\.|(^|\/)(__tests__|tests?)\//i;
+const SMELL = /\b(useState|useRef|useReducer|useEffect|useLayoutEffect|useCallback|useMemo|mutableStateOf|MutableStateFlow|MutableLiveData|@State|@Published|setState)\b/g;
+const IMPORT = /(?:from|require\(|import\()\s*["']([^"']+)["']/g;
 const ENTRY = /(^|\/)(app|pages|routes|screens|views|controllers|handlers|api)\/|(page|layout|route|screen|controller|handler|activity|fragment|viewmodel)\.[a-z]+$/i;
 
 const [command = "paths", ...args] = process.argv.slice(2);
@@ -99,20 +102,47 @@ function packages() {
     .sort((a, b) => a.path.localeCompare(b.path));
 }
 
+const stemOf = (spec) => {
+  const parts = spec.replace(/\/index$/, "").split("/");
+  return parts[parts.length - 1].replace(/\.(m?[jt]sx?|vue|svelte)$/, "");
+};
+
+function suggestedDepth(codeFiles) {
+  return codeFiles <= 60 ? 3 : codeFiles <= 150 ? 4 : codeFiles <= 400 ? 5 : 6;
+}
+
 function hotspots(dir, limit) {
   const scope = dir && dir !== "." ? dir.replace(/\/$/, "") : "";
-  const files = trackedFiles(scope).filter((f) => !TEST.test(f));
+  const all = trackedFiles(scope);
+  const files = all.filter((f) => !TEST.test(f));
   const churn = new Map();
   const log = sh(`git log --since=6.months --name-only --format= -- ${scope ? `'${scope}'` : "."}`, root);
   if (log.ok) for (const f of log.out.split("\n").filter(Boolean)) churn.set(f, (churn.get(f) ?? 0) + 1);
-  return files
+
+  const fanIn = new Map();
+  const info = new Map();
+  for (const file of files.slice(0, 4000)) {
+    const text = readFileSync(at(file), "utf8");
+    info.set(file, { lines: text.split("\n").length, smells: (text.match(SMELL) ?? []).length });
+    for (const match of text.matchAll(IMPORT)) {
+      if (!match[1].startsWith(".") && !match[1].startsWith("@/") && !match[1].startsWith("~/")) continue;
+      const stem = stemOf(match[1]);
+      fanIn.set(stem, (fanIn.get(stem) ?? 0) + 1);
+    }
+  }
+
+  const rows = files
+    .filter((f) => info.has(f))
     .map((file) => {
-      const lines = readFileSync(at(file), "utf8").split("\n").length;
+      const { lines, smells } = info.get(file);
       const commits = churn.get(file) ?? 0;
-      return { file, lines, commits, entry: ENTRY.test(file), score: lines * (1 + commits) };
+      const name = stemOf(file);
+      const fan = fanIn.get(name === "index" ? stemOf(posix.dirname(file)) : name) ?? 0;
+      const score = Math.round(lines * (1 + commits) * (1 + smells / 8) * (1 + fan / 5));
+      return { file, lines, commits, smells, fan, entry: ENTRY.test(file), score };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
+  return { rows: rows.slice(0, limit), depth: suggestedDepth(all.length), codeFiles: all.length };
 }
 
 function writeState(patch) {
@@ -133,11 +163,23 @@ if (command === "paths") {
   process.stdout.write(`${JSON.stringify(packages(), null, 2)}\n`);
 } else if (command === "hotspots") {
   const [dir = ".", limit = "15"] = args;
-  const rows = hotspots(dir, Number(limit) || 15);
-  process.stdout.write(
-    `${["score\tlines\tcommits(6m)\tentry\tfile", ...rows.map((r) => `${r.score}\t${r.lines}\t${r.commits}\t${r.entry ? "yes" : ""}\t${r.file}`)].join("\n")}\n`,
-  );
+  const { rows, depth, codeFiles } = hotspots(dir, Number(limit) || 15);
+  const lines = rows.map((r) => `${r.score}\t${r.lines}\t${r.commits}\t${r.smells}\t${r.fan}\t${r.entry ? "yes" : ""}\t${r.file}`);
+  process.stdout.write(`${[`code files: ${codeFiles} · suggested depth: ${depth}`, "score\tlines\tcommits(6m)\tstate-hooks\tfan-in\tentry\tfile", ...lines].join("\n")}\n`);
+} else if (command === "backlog") {
+  const mode = args[0] ?? "roadmap";
+  if (!existsSync(context.findingsFile)) {
+    process.stderr.write(`No backlog at ${context.findingsFile}. Run /craft:architect assess first.\n`);
+    process.exit(1);
+  }
+  const { parsed, problems } = checkBacklog(readFileSync(context.findingsFile, "utf8"));
+  if (mode === "check") {
+    process.stdout.write(problems.length ? `${problems.map((p) => `- ${p}`).join("\n")}\n` : `OK: ${parsed.findings.length} findings\n`);
+    process.exit(problems.length ? 1 : 0);
+  }
+  if (problems.length) process.stderr.write(`Backlog problems (fix with /craft:architect or edit ${context.findingsFile}):\n${problems.map((p) => `- ${p}`).join("\n")}\n\n`);
+  process.stdout.write(renderRoadmap(roadmap(parsed)));
 } else {
-  process.stderr.write("Usage: repo.mjs [paths | mark | packages | hotspots <dir> [limit]]\n");
+  process.stderr.write("Usage: repo.mjs [paths | mark | packages | hotspots <dir> [limit] | backlog [roadmap|check]]\n");
   process.exit(1);
 }

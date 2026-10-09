@@ -61,6 +61,17 @@ If a repo contains `.claude/conventions.md` or `.claude/craft.json` (because a t
 | Python | import-linter | yes, when configured |
 | Go | `internal/` + depguard | yes, when `.golangci.*` exists |
 
+### Findings backlog
+
+`assess` writes findings with severity, kind, rule IDs, effort, blast radius, whether tests cover the code, and dependencies marked `hard` or `soft` with a reason. Ordering is computed, not improvised:
+
+```bash
+node <plugin>/hooks/repo.mjs backlog          # sequenced roadmap with "Start here"
+node <plugin>/hooks/repo.mjs backlog check    # validate the file: fields, unknown IDs, dependency cycles
+```
+
+`assess` always ends with that roadmap, a `Structure` and a `Code design` verdict, and how many files were read out of how many. `hotspots` ranks by size, churn, state hooks and fan-in, and suggests a depth that grows with the package.
+
 dependency-cruiser needs a `typescript` package below version 7; on TypeScript 7 repos keep `typescript@^6` as a dev dependency for it. Verify fails if it analyses 0 modules, so a silently broken check can't pass.
 
 ## Design checklist and the findings backlog
@@ -138,6 +149,14 @@ echo '{}' | CRAFT_VERIFY=plan node ~/.claude/plugins/cache/<...>/craft/hooks/ver
 ```
 
 All keys are optional. `verify` replaces auto-detection entirely (`false` disables the check for the repo). `tests: "full"` runs the whole suite instead of related tests. `CRAFT_VERIFY=off` disables it for one session.
+
+## Development
+
+```bash
+node --test plugins/craft/tests/*.test.mjs
+```
+
+The tests build small throwaway repos for each stack (pnpm, yarn, npm, Gradle, Python, monorepo), and cover the commit guard and the backlog parser. CI runs them on every push. Evals live in `plugins/craft/evals` (`claude plugin eval plugins/craft --scaffold --trust-plugin`).
 
 ## Turn off Claude Code's own commit attribution
 

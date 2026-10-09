@@ -1,0 +1,21 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Hook tests
+        run: node --test plugins/craft/tests/*.test.mjs
+      - name: Manifests parse
+        run: |
+          node -e "for (const f of ['.claude-plugin/marketplace.json','plugins/craft/.claude-plugin/plugin.json','plugins/craft/hooks/hooks.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
+      - name: Syntax check
+        run: for f in plugins/craft/hooks/*.mjs; do node --check "$f"; done

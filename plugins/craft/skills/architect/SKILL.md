@@ -8,7 +8,7 @@ argument-hint: "[assess [paths] [--depth N] | plan <IDs> | status | next | enfor
 
 `$ARGUMENTS` picks the mode. With no argument: `status` if a backlog exists for this repo, otherwise `assess`.
 
-Helper (run from the repo root): `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" <paths | packages | hotspots <dir> [limit]>`. `paths` gives `findingsFile` (the backlog) and `conventions`, both in craft's per-repo cache outside the repo. If the helper cannot run, do the same with `git ls-files`, `git log` and Glob.
+Helper (run from the repo root): `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" <paths | packages | hotspots <dir> [limit] | backlog [roadmap|check]>`. `paths` gives `findingsFile` (the backlog) and `conventions`, both in craft's per-repo cache outside the repo. If the helper cannot run, do the same with `git ls-files`, `git log` and Glob.
 
 Design rules: [design.md](design.md). Targets and enforcement: [reference.md](reference.md).
 
@@ -28,7 +28,9 @@ Per chosen package:
 - Duplication of a concept across modules.
 
 ### 3. Read the central units
-Run `hotspots <package> 15`. Pick the central units, default 3 per package (`--depth N` changes it): prefer entry points (screens, routes, controllers, ViewModels) and the main user flows, ranked by the hotspot score. Read each one end to end, plus the local modules it imports. Apply every rule in [design.md](design.md) to it, including its "Not a finding" section. Note evidence with line ranges.
+Run `hotspots <package> 15`. The score combines size, 6-month churn, state hooks and fan-in, and the first line gives a suggested depth that grows with the package's size. Read that many units per package (`--depth N` overrides), preferring entry points (screens, routes, controllers, ViewModels) and the main user flows, and also any unit scoring at least 60% of the top score. Read each one end to end, plus the local modules it imports. Apply every rule in [design.md](design.md) to it, including its "Not a finding" section. Note evidence with line ranges.
+
+Bug pass: while reading, also record anything that looks like a real defect (a reset or invalidation that one code path ignores, a fallback to a fake value such as 0,0 or an empty id, an error swallowed, a stale closure). These are `bug` findings with severity by impact, never `minor`. If you cannot confirm it from the code you read, say "suspected" in the Problem and what to check.
 
 ### 4. Write findings
 Each finding:
@@ -38,12 +40,14 @@ Each finding:
 Files: app/add-item.tsx:47-49, 147
 Problem: photo, existing and removePhoto allow impossible combinations; the upload payload is decided by flag checks.
 Fix: one Photo union (none | saved | new) with the payload derived from it.
-Effort: S · Depends on: A1 · Batch: add-item state model
+Effort: S · Blast: low · Tests: none · Depends on: A1 (hard: reuses the Draft type) · Batch: add-item state model
 ```
 
+- Blast is how much breaks if the change is wrong: `low` (one screen or file), `medium` (several screens or a shared hook), `high` (app-wide state, public API, persisted data). Tests is whether existing tests cover the touched code: `yes`, `partial` or `none`; `none` means the batch starts with characterization tests.
+- Depends on lists only real dependencies. `hard: <reason>` means the later change cannot be done or reviewed without the earlier one (a type or module it uses is introduced there). `soft: <reason>` means it is easier or cleaner afterwards but can go first. If you cannot state the reason, there is no dependency. Write `none` when there is none.
 - Kind is `design`, `structure`, `bug` or `minor` (definitions in design.md). Rule IDs: D1–D10 for design and minor, `S` for structure, none for bugs. Label honestly; a severity or kind inflated to make a finding look important is a calibration failure.
 - Group findings into batches: each batch is one coherent change that can ship on its own (usually one unit or one theme), ordered so dependencies come first.
-- Minor findings sit in their own group and are never part of a recommended batch.
+- Minor findings need only Files, Problem, Fix and Effort, and sit in their own group and are never part of a recommended batch.
 - No evidence, no finding. Calibrate with "Not a finding"; an empty list for a package is a valid result.
 
 ### 5. Backlog
@@ -54,10 +58,16 @@ Save to `findingsFile`, newest assessment first:
 Assessed: <date> at <short sha> · Scope: <packages> · Depth: <N>
 ```
 
-followed by the findings. If the file already exists, merge: keep IDs and statuses of findings that still apply, mark ones whose problem is gone as `done (gone at <sha>)`, append new ones with the next free ID. Never renumber.
+followed by the findings. If the file already exists, merge: keep IDs and statuses of findings that still apply, mark ones whose problem is gone as `done (gone at <sha>)`, append new ones with the next free ID. Never renumber. Then run `backlog check`; if it lists problems, fix the file and run it again until it prints OK.
 
 ### 6. Report and pick
-Your reply lists every finding (ID, severity, kind, one line, files), grouped by batch, minor group last, then a one-line "Guardrails" note if tests, linting or boundary tools are missing. Then AskUserQuestion (multiSelect) with up to 4 recommended batches: high severity first, then unblocked, then small effort. Label: the batch name. Description: its IDs and effort. The user can type other IDs under "Other". Then go to `plan` with the chosen IDs.
+Your reply is, in this order:
+1. The output of `backlog roadmap`, verbatim: it gives "Start here", the batches in dependency order with severity, effort, blast, tests and what each waits for, and the minor group last. Add one line per finding (ID, one-line problem, files) under it.
+2. A "Guardrails" line if tests, linting or boundary tools are missing.
+3. Two verdicts, each one line with a reason: `Structure: sound | needs work — <why>` and `Code design: sound | needs work — <why>`. Structure is folders, layers, imports and cycles; code design is the D-rules inside the files you read. They can differ, and a clean verdict is allowed when nothing was found.
+4. Scope note: how many files were read out of how many, so the user knows what is not covered.
+
+Then AskUserQuestion (multiSelect) with up to 4 batches taken from the roadmap in order, skipping batches that wait for one not yet chosen unless both are offered. Label: the batch name. Description: its IDs, effort and blast. The user can type other IDs under "Other". Then go to `plan` with the chosen IDs.
 
 When AskUserQuestion is not available or not answered, end with the list and: "Pick with /craft:architect plan <IDs>".
 
@@ -70,10 +80,10 @@ When AskUserQuestion is not available or not answered, end with the list and: "P
 6. If a target architecture was introduced or extended, update the `## Architecture` section in the conventions file and run `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" mark`.
 
 ## status
-Read the backlog. Show counts per status and severity, the remaining batches in order, and the date and commit of the last assessment. Suggest re-assessing if that commit is far behind HEAD.
+Run `backlog roadmap`. Show counts per status and severity, the roadmap it prints, and the date and commit of the last assessment. Suggest re-assessing if that commit is far behind HEAD.
 
 ## next
-Recommend up to 4 batches from the backlog (same ordering as in assess, step 6) and ask with AskUserQuestion (multiSelect). Then `plan` the chosen ones.
+Run `backlog roadmap` and recommend up to 4 batches in its order and ask with AskUserQuestion (multiSelect). Then `plan` the chosen ones.
 
 ## Targets
 Size first:
