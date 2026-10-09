@@ -1,0 +1,25 @@
+{
+  "name": "shekey",
+  "owner": {
+    "name": "Ajdin"
+  },
+  "metadata": {
+    "description": "Engineering discipline plugins for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "craft",
+      "source": "./plugins/craft",
+      "description": "Language-agnostic engineering discipline: plan first, adapt to the repo, lean code, simple interfaces, no noise comments, verified before done, human-style commits."
+    },
+    {
+      "name": "code-simplifier",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/code-simplifier"
+      },
+      "description": "Anthropic's code-simplifier agent, installed automatically as a craft dependency."
+    }
+  ]
+}
