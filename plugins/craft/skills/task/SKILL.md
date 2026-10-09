@@ -43,9 +43,23 @@ The mode comes from the repo's craft settings (`improve`), stated in the session
 - `record`: change nothing beyond the task; put every improvement in the backlog. Use it for repos you don't own (agency or client work).
 - `off`: skip this step.
 
-While working, note problems in the code you read. Then sort them:
-- **Fix now** (mode `fix` only): inside the files the task already changes, behavior-preserving, covered by tests or obviously safe, and small (about one function or 30 lines). Examples: a dead branch, a misleading name, a duplicated literal, a missing type, an unhandled promise, a D10 item. Commit it on its own (`Rename…`, `Remove unused…`), never inside the bug fix or feature commit.
-- **Backlog**: anything wider: other files, behavior changes, a design finding (D1–D9), anything that needs its own tests or review. Add it to the findings backlog (`findingsFile` from `repo.mjs paths`) in the `craft:architect` finding format with the next free ID, `todo` status and real evidence, then run `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" backlog check`. Do not touch that code.
+Run this pass on every path that changes code, trivial changes included, once the task works and before the first commit:
+1. Re-read each file the task changed, whole, and the local modules the changed code calls into (one level deep).
+2. List what you see. Use the design checklist and this short list: unused imports or variables, misleading names (`x`, `data`, `tmp`), needless branches (`else` after `return`, `if (cond) return true; else return false`), loose equality, the same steps repeated in several functions (the task adding another copy is the moment to extract it), swallowed errors, promises nobody awaits or catches.
+3. Sort each item:
+   - **Fix now** (mode `fix` only): inside the files the task already changes, behavior-preserving, covered by tests or obviously safe, and small (about one function or 30 lines). Commit it on its own (`Remove unused import…`, `Extract save helper…`), never inside the bug fix or feature commit. Run the tests again after it.
+   - **Backlog**: anything wider: other files, behavior changes, a design finding (D1–D9), anything that needs its own tests or review. Do not touch that code. Add it to the findings backlog (`findingsFile` from `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" paths`); create the file with a `# Findings · <repo key>` heading if it doesn't exist, use the next free ID, then run `repo.mjs backlog check` until it prints OK:
+
+```
+## A4 · medium · design · D7 · todo
+Files: src/billing/invoice.ts:40-58, src/checkout/total.ts:12-30
+Problem: discount rules are rebuilt by hand in invoice and checkout, so they drift.
+Fix: one applyDiscounts(lines) next to the Discount type, used by both.
+Effort: S · Blast: medium · Tests: partial · Depends on: none · Batch: discount rules
+```
+
+   Kind is `bug`, `design` (with its D rule after the kind), `structure` (`S`) or `minor`; the full format is in `craft:architect`.
+4. The end line names what you did: `Improved: removed an unused import, extracted save() in src/orders.ts · Backlog: A4 discount rules duplicated`. `none` is right only when the pass found nothing.
 
 List the planned improvements in the plan's `While here` line. Lean still applies: no speculative cleanups, no style churn the repo doesn't ask for, and the repo's conventions decide what "better" means.
 
