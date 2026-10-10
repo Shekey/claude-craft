@@ -8,7 +8,7 @@ argument-hint: "[assess [paths] [--depth N] | plan <IDs> | status | next | enfor
 
 `$ARGUMENTS` picks the mode. With no argument: `status` if a backlog exists for this repo, otherwise `assess`.
 
-Helper (run from the repo root): `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" <paths | packages | hotspots <dir> [limit] | backlog [roadmap|check]>`. `paths` gives `findingsFile` (the backlog) and `conventions`, both in craft's per-repo cache outside the repo. If the helper cannot run, do the same with `git ls-files`, `git log` and Glob.
+Helper (run from the repo root): `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" <paths | packages | hotspots <dir> [limit] | layout <dir> [limit] | backlog [roadmap|check]>`. `paths` gives `findingsFile` (the backlog) and `conventions`, both in craft's per-repo cache outside the repo. If the helper cannot run, do the same with `git ls-files`, `git log` and Glob.
 
 Design rules: [design.md](design.md). Targets and enforcement: [reference.md](reference.md).
 
@@ -26,6 +26,20 @@ Per chosen package:
 - Cycles: TS/JS `npx -y madge --circular --extensions ts,tsx,js,jsx <dir>`; Python `uvx pydeps --show-cycles --no-output <pkg>`. Skip if the tool cannot run and say so.
 - Wrong-way imports: UI importing data access directly, shared code importing features, domain code importing framework or database code. In a monorepo also: an app importing another app, a package importing an app, deep imports into a package's internals instead of its public entry.
 - Duplication of a concept across modules.
+- Layout: run `layout <package>`. It prints the code file count with a suggested size tier, the folders holding the most code files and the largest files with their component count, and marks anything past the thresholds with `flag`. Every flagged folder or file is a `structure` finding (rule `S`) unless "Not a finding" in design.md exempts it; the layout section of design.md says how to judge and fix it.
+
+### 2b. Size tier and layout decision
+Decide the size tier per package and write it down; never leave it implicit. Start from the tier `layout` suggests and override it only with a stated reason (one feature with many generated files is still small; a 40-file app with six unrelated features is medium). The tier picks the target in section Targets.
+
+Then compare the existing layout with that target. They conflict when `layout` flags anything, or when a medium-and-up package has no grouping by feature or domain at all (a flat `lib/`, `utils/`, `components/` or `src/` holding unrelated concerns side by side).
+
+On a conflict, read the `Layout:` line in the `## Architecture` section of the conventions file (`paths` gives `conventions`):
+- `Layout: keep` — keep the current style. Layout findings are still reported, with fixes inside that style (split the file, sub-folders by concept in `lib/`), and no migration to the target is recommended.
+- `Layout: challenge` — the target for the tier is the direction. Structure findings name the target folder each piece moves to.
+
+With no `Layout:` line, ask once with AskUserQuestion: "The current layout (<one line on what conflicts>) differs from the <tier> target (<target>). Keep it or move toward the target?" Options: "Keep the current layout" and "Move toward <target>". Write the answer to the conventions file as `Layout: keep | challenge · <tier> · <date> · <one-line reason>` and run `mark`, so later runs do not ask again. Ask again only when the user asks or the tier has changed since the recorded one.
+
+If AskUserQuestion is not available or not answered, do not record anything and do not default to keep: report the layout findings, set the decision to `open`, and say in the report what the choice is.
 
 ### 3. Read the central units
 Run `hotspots <package> 15`. The score combines size, 6-month churn, state hooks and fan-in, and the first line gives a suggested depth that grows with the package's size. Read that many units per package (`--depth N` overrides), preferring entry points (screens, routes, controllers, ViewModels) and the main user flows, and also any unit scoring at least 60% of the top score. Read each one end to end, plus the local modules it imports. Apply every rule in [design.md](design.md) to it, including its "Not a finding" section, plus the design signals of the package's stack pack (`repo.mjs stack`). Note evidence with line ranges.
@@ -64,8 +78,9 @@ followed by the findings. If the file already exists, merge: keep IDs and status
 Your reply is, in this order:
 1. The output of `backlog roadmap`, verbatim: it gives "Start here", the batches in dependency order with severity, effort, blast, tests and what each waits for, and the minor group last. Add one line per finding (ID, one-line problem, files) under it.
 2. A "Guardrails" line if tests, linting or boundary tools are missing.
-3. Two verdicts, each one line with a reason: `Structure: sound | needs work — <why>` and `Code design: sound | needs work — <why>`. Structure is folders, layers, imports and cycles; code design is the D-rules inside the files you read. They can differ, and a clean verdict is allowed when nothing was found.
-4. Scope note: how many files were read out of how many, so the user knows what is not covered.
+3. The tier and the layout decision, one line: `Size: small | medium+ — <why> · Layout: fits | keep | challenge | open — <what conflicts>`. `fits` means no conflict was found.
+4. Two verdicts, each one line with a reason: `Structure: sound | needs work — <why>` and `Code design: sound | needs work — <why>`. Structure is folders, layers, imports and cycles; code design is the D-rules inside the files you read. They can differ, and a clean verdict is allowed when nothing was found.
+5. Scope note: how many files were read out of how many, so the user knows what is not covered.
 
 Then AskUserQuestion (multiSelect) with up to 4 batches taken from the roadmap in order, skipping batches that wait for one not yet chosen unless both are offered. Label: the batch name. Description: its IDs, effort and blast. The user can type other IDs under "Other". Then go to `plan` with the chosen IDs.
 
@@ -73,7 +88,7 @@ When AskUserQuestion is not available or not answered, end with the list and: "P
 
 ## plan <IDs>
 1. Read the chosen findings from the backlog and re-check their evidence against the current code.
-2. If they change module or folder structure, choose the target first (section Targets) and include it.
+2. If they change module or folder structure, choose the target first (section Targets), following the `Layout:` decision in the conventions file, and include it. If the decision is missing or `open`, ask it now as in assess step 2b.
 3. Present the plan in the craft:plan shape, covering only the chosen IDs. Wait for approval.
 4. Migrate following craft:refactor: characterization tests first, one batch per commit or a few small commits per batch, verify after each.
 5. After each batch is committed, set its findings to `done (<short sha>)` in the backlog. If the work reveals a new problem, add it as a new finding instead of widening the batch.
@@ -95,7 +110,7 @@ Defaults (rules in [reference.md](reference.md)):
 - **Backend**: feature modules with a public entry each; ports and adapters only around real external I/O you need to swap or fake.
 - **Android / Kotlin**: a module or package per feature with `ui` and `data`; `domain` only for logic shared across screens.
 - **Monorepo**: apps never import apps; packages never import apps; apps use packages only through their public entry.
-- **Existing repo with a working architecture**: keep it and fix the findings. Do not migrate to a default because it is the default.
+- **Existing repo with a working architecture**: keep it and fix the findings. Do not migrate to a default because it is the default. "Working" means it passes the layout thresholds for its tier; when it does not, the `Layout:` decision (assess step 2b) says whether to keep or challenge it, and keeping is the user's call, never a silent default.
 
 Record the target in the `## Architecture` section of the conventions file: style, folder map, dependency rules, enforcement command, migration status per area.
 

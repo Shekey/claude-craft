@@ -4,7 +4,7 @@ Apply each rule to a unit you have read end to end. A finding needs evidence: fi
 
 Kinds:
 - **design**: a D1–D9 rule below is broken.
-- **structure**: cycles, wrong-way imports, monorepo boundary breaks.
+- **structure**: cycles, wrong-way imports, monorepo boundary breaks, and layout problems (see Layout below).
 - **bug**: wrong behavior you can describe concretely (input, what happens, what should happen). Bugs found while reading are worth reporting, but label them as bugs and never attach a D rule to one.
 - **minor**: local hygiene (D10, wording, small duplication). Never part of a recommended batch.
 
@@ -52,6 +52,13 @@ Fix: extract only after confirming it is repeated (search the repo); one hook or
 Non-null assertions, unchecked casts, promises without error handling, ignored results, magic values.
 Fix: a type, an early return or explicit handling that makes the rule visible.
 
+## Layout
+Structure findings from `repo.mjs layout`, rule `S`. The question is whether someone can find and change one concern without reading unrelated code.
+- **Crowded folder**: 20 or more code files directly in one folder, unless the folder's own role keeps them together (a route folder shaped by the framework, a migrations folder, a UI kit of primitives). Check what the files are about: unrelated concerns side by side (auth, billing, settings, formatting in one `lib/`) is the finding. Fix: group by the feature or entity each file serves; what has no business meaning goes to `shared/` sub-folders by purpose (`api`, `lib`, `ui`).
+- **Many components in one file**: 5 or more components in a file of 150 lines or more. Fix: one file per component that has its own state, props or reason to change, in a folder named after the screen or feature (`settings/ui/NotificationsCard.tsx`); tiny private helpers used only by one component can stay with it.
+- **Oversized file**: 400 lines or more. Usually a D1 problem in disguise; read it and report the responsibilities, or say why it is one concern (a long form layout).
+Severity: medium when it slows every change to the area (a crowded folder that every feature touches, a file several screens edit), minor when it is one isolated file. Never high on its own.
+
 ## Not a finding
 Calibration matters as much as detection. Do not report:
 - A long unit with one responsibility (a big form layout is still one concern).
@@ -59,7 +66,7 @@ Calibration matters as much as detection. Do not report:
 - A concern that appears once and is already in a named hook, service or component.
 - Missing abstractions with only one use today.
 - Styling choices (inline styles versus style sheets) and formatting.
-- A different but consistent pattern the repo uses everywhere: that is a convention, not a defect.
+- A different but consistent pattern the repo uses everywhere: that is a convention, not a defect. This does not cover layout past the Layout thresholds: a flat folder used everywhere is still reported, and the `Layout:` decision in the conventions file decides whether the fix keeps the current style.
 - A component, screen or controller that renders and wires named hooks, use cases or services: coordinating them is its one responsibility. D1 applies only when the unit implements the concerns itself.
 - A screen's own controller hook or ViewModel that holds the screen state and turns user intents into feedback for that screen (messages, confirmation dialogs, navigation): that is the screen's coordination. Flag it only when it also implements I/O, device access or domain rules itself.
 - Calling the same pure helper twice: D7 is about rebuilding the same structure by hand in several places.

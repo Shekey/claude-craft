@@ -146,6 +146,47 @@ function hotspots(dir, limit) {
   return { rows: rows.slice(0, limit), depth: suggestedDepth(all.length), codeFiles: all.length };
 }
 
+const SMALL_TIER_MAX = 50;
+const FOLDER_FLAG = 20;
+const FILE_LINES_FLAG = 400;
+const COMPONENTS_FLAG = 5;
+const COMPONENT_FILE_LINES = 150;
+const COMPONENT = /^(?:export\s+)?(?:default\s+)?(?:function\s+[A-Z][a-z]\w*|const\s+[A-Z][a-z]\w*\s*[=:]|class\s+[A-Z][a-z]\w*\s+extends\b)/gm;
+const COMPOSABLE = /@Composable\s+(?:\w+\s+)*fun\s+[A-Z]/g;
+
+function components(file, text) {
+  if (/\.[jt]sx$/i.test(file)) return (text.match(COMPONENT) ?? []).length;
+  if (/\.kt$/i.test(file)) return (text.match(COMPOSABLE) ?? []).length;
+  return 0;
+}
+
+function layout(dir, limit) {
+  const scope = dir && dir !== "." ? dir.replace(/\/$/, "") : "";
+  const all = trackedFiles(scope);
+  const files = all.filter((f) => !TEST.test(f));
+  const perFolder = new Map();
+  for (const file of files) {
+    const folder = posix.dirname(file);
+    perFolder.set(folder, (perFolder.get(folder) ?? 0) + 1);
+  }
+  const folders = [...perFolder]
+    .map(([folder, count]) => ({ folder, count, flag: count >= FOLDER_FLAG }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+  const sizes = files
+    .slice(0, 4000)
+    .map((file) => {
+      const text = readFileSync(at(file), "utf8");
+      const lines = text.split("\n").length;
+      const count = components(file, text);
+      const flag = lines >= FILE_LINES_FLAG || (count >= COMPONENTS_FLAG && lines >= COMPONENT_FILE_LINES);
+      return { file, lines, components: count, flag };
+    })
+    .sort((a, b) => Number(b.flag) - Number(a.flag) || b.lines - a.lines)
+    .slice(0, limit);
+  return { codeFiles: all.length, tier: all.length <= SMALL_TIER_MAX ? "small" : "medium+", folders, files: sizes };
+}
+
 function writeState(patch) {
   mkdirSync(context.cacheDir, { recursive: true });
   writeFileSync(context.stateFile, `${JSON.stringify({ ...context.state, ...patch }, null, 2)}\n`);
@@ -171,6 +212,22 @@ if (command === "paths") {
   const { rows, depth, codeFiles } = hotspots(dir, Number(limit) || 15);
   const lines = rows.map((r) => `${r.score}\t${r.lines}\t${r.commits}\t${r.smells}\t${r.fan}\t${r.entry ? "yes" : ""}\t${r.file}`);
   process.stdout.write(`${[`code files: ${codeFiles} · suggested depth: ${depth}`, "score\tlines\tcommits(6m)\tstate-hooks\tfan-in\tentry\tfile", ...lines].join("\n")}\n`);
+} else if (command === "layout") {
+  const [dir = ".", limit = "8"] = args;
+  const { codeFiles, tier, folders, files } = layout(dir, Number(limit) || 8);
+  const mark = (flag) => (flag ? "\tflag" : "");
+  process.stdout.write(
+    `${[
+      `code files: ${codeFiles} · size tier: ${tier} (small is up to ${SMALL_TIER_MAX} code files)`,
+      "",
+      `folders by code files (flag at ${FOLDER_FLAG}+)`,
+      ...folders.map((f) => `${f.count}\t${f.folder}${mark(f.flag)}`),
+      "",
+      `files (flag at ${FILE_LINES_FLAG}+ lines, or ${COMPONENTS_FLAG}+ components in ${COMPONENT_FILE_LINES}+ lines)`,
+      "lines\tcomponents\tfile",
+      ...files.map((f) => `${f.lines}\t${f.components}\t${f.file}${mark(f.flag)}`),
+    ].join("\n")}\n`,
+  );
 } else if (command === "backlog") {
   const mode = args[0] ?? "roadmap";
   if (!existsSync(context.findingsFile)) {
@@ -185,6 +242,6 @@ if (command === "paths") {
   if (problems.length) process.stderr.write(`Backlog problems (fix with /craft:architect or edit ${context.findingsFile}):\n${problems.map((p) => `- ${p}`).join("\n")}\n\n`);
   process.stdout.write(renderRoadmap(roadmap(parsed)));
 } else {
-  process.stderr.write("Usage: repo.mjs [paths | stack | mark | packages | hotspots <dir> [limit] | backlog [roadmap|check]]\n");
+  process.stderr.write("Usage: repo.mjs [paths | stack | mark | packages | hotspots <dir> [limit] | layout <dir> [limit] | backlog [roadmap|check]]\n");
   process.exit(1);
 }

@@ -12,7 +12,7 @@ If the conventions file exists, read it and trust it. Re-check only the parts th
 Otherwise discover, then write the conventions file (max ~50 lines, facts only):
 
 - **Stack and tooling**: the stacks from `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" stack` and where each lives, language versions, package manager (from the lockfile), formatter, linter, type checker, test runner, the scripts or tasks that run them.
-- **Architecture**: the style in use (feature folders, FSD, layered, modules, hexagonal, none), the folder map, the direction of dependencies, where business logic lives versus UI or I/O, any boundary tool already configured. If it hurts, note the pain in one line; propose `craft:architect` in a plan only when the user's task needs it.
+- **Architecture**: the style in use (feature folders, FSD, layered, modules, hexagonal, none), the folder map, the direction of dependencies, where business logic lives versus UI or I/O, any boundary tool already configured. If it hurts, note the pain in one line; propose `craft:architect` in a plan only when the user's task needs it. Keep any `Layout: keep | challenge` line already there: `craft:architect` owns it and records whether the user wants the current layout kept or moved toward a target.
 - **Patterns**: state management, data fetching, DI style, error handling, validation, logging.
 - **Naming**: files, components, functions, tests, branches.
 - **Tests**: location, naming, fixtures and mocks style, what is usually tested.

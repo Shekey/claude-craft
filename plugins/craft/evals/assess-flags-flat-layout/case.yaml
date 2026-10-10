@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: assess-flags-flat-layout
+description: "Otherwise tidy app with a flat lib/ of 46 files and a 9-component settings file; assess must flag the layout and surface the keep-or-challenge decision instead of treating the flat layout as convention."
+tags: [architect, calibration, layout]
+context:
+  scaffold_script: fixture.sh
