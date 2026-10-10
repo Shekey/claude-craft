@@ -107,7 +107,7 @@ node <plugin>/hooks/repo.mjs backlog check    # validate the file: fields, unkno
 
 `assess` always ends with that roadmap, a `Structure` and a `Code design` verdict, and how many files were read out of how many. `hotspots` ranks by size, churn, state hooks and fan-in, and suggests a depth that grows with the package.
 
-Layout is measured too. `repo.mjs layout <dir>` lists the most crowded folders (flag at 20+ code files), oversized files (400+ lines) and files with many components (5+ in 150+ lines), and suggests a size tier. `assess` states the tier, and when the existing layout conflicts with the target for that tier it asks once whether to keep the layout or move toward the target, recording the answer as a `Layout:` line in the repo's conventions. When nobody can answer, the decision is reported as `open` instead of silently keeping the layout.
+Layout and repo patterns are measured too. `repo.mjs layout <dir>` lists the most crowded folders (flag at 20+ code files), oversized files (400+ lines), files with many components (5+ in 150+ lines) and whether several components per file is a repo-wide pattern, and suggests a size tier. `assess` states the tier. A rule break the repo repeats (the same D rule in 3+ units, several components per file, a layout that conflicts with the target for its tier) becomes one `Repo pattern:` finding, and craft asks once whether to keep it, change it gradually or change it now. The answer goes to a `## Decisions` section in the repo's conventions: `keep` makes it the convention, `gradual` makes new code follow the rule and moves files as tasks touch them, `now` puts it in the backlog as batches. When nobody can answer, the decision is reported as `open`, never silently kept.
 
 dependency-cruiser needs a `typescript` package below version 7; on TypeScript 7 repos keep `typescript@^6` as a dev dependency for it. Verify fails if it analyses 0 modules, so a silently broken check can't pass.
 
@@ -131,7 +131,9 @@ Rule order: correctness and guardrails, then design, then lean. Lean decides sco
 `plugins/craft/evals/` holds:
 
 - calibration cases for assess: a screen with known design problems that must be found, and the same feature built cleanly where nothing must be invented;
-- `assess-flags-flat-layout`: a tidy app with a flat `lib/` of 46 files and a 9-component settings file must get layout findings, a stated size tier and an open keep-or-challenge decision;
+- `assess-flags-flat-layout`: a tidy app with a flat `lib/` of 46 files and a 9-component settings file must get layout findings, a stated size tier and an open layout decision;
+- `assess-asks-about-repo-pattern`: well-foldered code where most screens hold several components per file must get one repo-pattern finding and an open keep / gradual / now decision;
+- `gradual-pattern-new-file`: with `several components per file · gradual` decided, a new component gets its own file;
 - router cases, one per task type (`route-*`): a question makes no edits, a bug gets a failing test before the fix and the same bug found elsewhere, tests name the clock as the blocker, cleanup pins behavior first, a feature is planned and mirrors the CLI;
 - `adapt-keeps-repo-tooling`: a repo with ESLint, Jest and a layered layout keeps them, with no Biome, Vitest or FSD brought in;
 - `improve-separate-commit`: touched-file fixes land in their own commit and a far-away problem goes to the backlog untouched.

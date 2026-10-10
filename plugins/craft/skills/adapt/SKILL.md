@@ -12,7 +12,7 @@ If the conventions file exists, read it and trust it. Re-check only the parts th
 Otherwise discover, then write the conventions file (max ~50 lines, facts only):
 
 - **Stack and tooling**: the stacks from `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" stack` and where each lives, language versions, package manager (from the lockfile), formatter, linter, type checker, test runner, the scripts or tasks that run them.
-- **Architecture**: the style in use (feature folders, FSD, layered, modules, hexagonal, none), the folder map, the direction of dependencies, where business logic lives versus UI or I/O, any boundary tool already configured. If it hurts, note the pain in one line; propose `craft:architect` in a plan only when the user's task needs it. Keep any `Layout: keep | challenge` line already there: `craft:architect` owns it and records whether the user wants the current layout kept or moved toward a target.
+- **Architecture**: the style in use (feature folders, FSD, layered, modules, hexagonal, none), the folder map, the direction of dependencies, where business logic lives versus UI or I/O, any boundary tool already configured. If it hurts, note the pain in one line; propose `craft:architect` in a plan only when the user's task needs it. Keep any `## Decisions` section already in the file: `craft:architect` owns it and records, per layout or repo pattern, whether the user keeps it, changes it gradually or changes it now.
 - **Patterns**: state management, data fetching, DI style, error handling, validation, logging.
 - **Naming**: files, components, functions, tests, branches.
 - **Tests**: location, naming, fixtures and mocks style, what is usually tested.
@@ -52,6 +52,6 @@ Finally run `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" mark` to record the com
 Only create `.claude/` files inside the repo when the user wants to share them with the team.
 
 Rules while implementing:
-- Mirror the closest existing example, even where you would design it differently.
+- Mirror the closest existing example, even where you would design it differently. The exception is a `gradual` or `now` line in `## Decisions`: new code follows the decided rule there, not the old pattern (for "several components per file", a new component gets its own file even if its neighbours share one).
 - When conventions are inconsistent, follow the newest code in the area you are touching.
 - Raise disagreements with the architecture in the plan; do not act on them unasked.

@@ -151,7 +151,11 @@ const FOLDER_FLAG = 20;
 const FILE_LINES_FLAG = 400;
 const COMPONENTS_FLAG = 5;
 const COMPONENT_FILE_LINES = 150;
+const SHARED_FILE_COMPONENTS = 3;
+const PATTERN_MIN_FILES = 3;
+const PATTERN_SHARE = 0.25;
 const COMPONENT = /^(?:export\s+)?(?:default\s+)?(?:function\s+[A-Z][a-z]\w*|const\s+[A-Z][a-z]\w*\s*[=:]|class\s+[A-Z][a-z]\w*\s+extends\b)/gm;
+const UI_KIT = /(^|\/)(shared|common|components|design-system)\/ui(\/|\.[jt]sx$)|(^|\/)(ui-kit|design-system)\//i;
 const COMPOSABLE = /@Composable\s+(?:\w+\s+)*fun\s+[A-Z]/g;
 
 function components(file, text) {
@@ -173,18 +177,23 @@ function layout(dir, limit) {
     .map(([folder, count]) => ({ folder, count, flag: count >= FOLDER_FLAG }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
-  const sizes = files
-    .slice(0, 4000)
-    .map((file) => {
-      const text = readFileSync(at(file), "utf8");
-      const lines = text.split("\n").length;
-      const count = components(file, text);
-      const flag = lines >= FILE_LINES_FLAG || (count >= COMPONENTS_FLAG && lines >= COMPONENT_FILE_LINES);
-      return { file, lines, components: count, flag };
-    })
-    .sort((a, b) => Number(b.flag) - Number(a.flag) || b.lines - a.lines)
-    .slice(0, limit);
-  return { codeFiles: all.length, tier: all.length <= SMALL_TIER_MAX ? "small" : "medium+", folders, files: sizes };
+  const measured = files.slice(0, 4000).map((file) => {
+    const text = readFileSync(at(file), "utf8");
+    const lines = text.split("\n").length;
+    const count = components(file, text);
+    const flag = lines >= FILE_LINES_FLAG || (count >= COMPONENTS_FLAG && lines >= COMPONENT_FILE_LINES);
+    return { file, lines, components: count, flag };
+  });
+  const withComponents = measured.filter((f) => f.components > 0 && !UI_KIT.test(f.file));
+  const shared = withComponents.filter((f) => f.components >= SHARED_FILE_COMPONENTS);
+  const sharing = {
+    files: shared.length,
+    of: withComponents.length,
+    flag: shared.length >= PATTERN_MIN_FILES && shared.length >= withComponents.length * PATTERN_SHARE,
+    examples: shared.sort((a, b) => b.components - a.components).slice(0, 5).map((f) => f.file),
+  };
+  const sizes = measured.sort((a, b) => Number(b.flag) - Number(a.flag) || b.lines - a.lines).slice(0, limit);
+  return { codeFiles: all.length, tier: all.length <= SMALL_TIER_MAX ? "small" : "medium+", folders, files: sizes, sharing };
 }
 
 function writeState(patch) {
@@ -214,7 +223,7 @@ if (command === "paths") {
   process.stdout.write(`${[`code files: ${codeFiles} · suggested depth: ${depth}`, "score\tlines\tcommits(6m)\tstate-hooks\tfan-in\tentry\tfile", ...lines].join("\n")}\n`);
 } else if (command === "layout") {
   const [dir = ".", limit = "8"] = args;
-  const { codeFiles, tier, folders, files } = layout(dir, Number(limit) || 8);
+  const { codeFiles, tier, folders, files, sharing } = layout(dir, Number(limit) || 8);
   const mark = (flag) => (flag ? "\tflag" : "");
   process.stdout.write(
     `${[
@@ -226,6 +235,9 @@ if (command === "paths") {
       `files (flag at ${FILE_LINES_FLAG}+ lines, or ${COMPONENTS_FLAG}+ components in ${COMPONENT_FILE_LINES}+ lines)`,
       "lines\tcomponents\tfile",
       ...files.map((f) => `${f.lines}\t${f.components}\t${f.file}${mark(f.flag)}`),
+      "",
+      `repo patterns (flag at ${PATTERN_MIN_FILES}+ files and ${PATTERN_SHARE * 100}%+ of component files, UI kits excluded)`,
+      `several components per file (${SHARED_FILE_COMPONENTS}+): ${sharing.files} of ${sharing.of} component files${mark(sharing.flag)}${sharing.examples.length ? ` · e.g. ${sharing.examples.join(", ")}` : ""}`,
     ].join("\n")}\n`,
   );
 } else if (command === "backlog") {
