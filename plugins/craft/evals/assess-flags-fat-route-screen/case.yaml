@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: assess-flags-fat-route-screen
+description: "Expo app whose fit route is a 370-line file with five components and view logic computed from the recommendation inline; assess must ask for a thin route, move the derivation to pure functions or a view-model hook, and not prescribe a DI container."
+tags: [architect, calibration, layout]
+context:
+  scaffold_script: fixture.sh

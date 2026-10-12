@@ -8,7 +8,7 @@ argument-hint: "[assess [paths] [--depth N] | plan <IDs> | status | next | enfor
 
 `$ARGUMENTS` picks the mode. With no argument: `status` if a backlog exists for this repo, otherwise `assess`.
 
-Helper (run from the repo root): `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" <paths | packages | hotspots <dir> [limit] | layout <dir> [limit] | backlog [roadmap|check]>`. `paths` gives `findingsFile` (the backlog) and `conventions`, both in craft's per-repo cache outside the repo. If the helper cannot run, do the same with `git ls-files`, `git log` and Glob.
+Helper (run from the repo root): `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" <paths | packages | hotspots <dir> [limit] | layout <dir> [limit] | signals [files] | backlog [roadmap|check]>`. `paths` gives `findingsFile` (the backlog) and `conventions`, both in craft's per-repo cache outside the repo. If the helper cannot run, do the same with `git ls-files`, `git log` and Glob.
 
 Design rules: [design.md](design.md). Targets and enforcement: [reference.md](reference.md).
 
@@ -26,7 +26,7 @@ Per chosen package:
 - Cycles: TS/JS `npx -y madge --circular --extensions ts,tsx,js,jsx <dir>`; Python `uvx pydeps --show-cycles --no-output <pkg>`. Skip if the tool cannot run and say so.
 - Wrong-way imports: UI importing data access directly, shared code importing features, domain code importing framework or database code. In a monorepo also: an app importing another app, a package importing an app, deep imports into a package's internals instead of its public entry.
 - Duplication of a concept across modules.
-- Layout: run `layout <package>`. It prints the code file count with a suggested size tier, the folders holding the most code files and the largest files with their component count, and marks anything past the thresholds with `flag`. Every flagged folder or file is a `structure` finding (rule `S`) unless "Not a finding" in design.md exempts it; the layout section of design.md says how to judge and fix it.
+- Layout: run `layout <package>`. It prints the code file count with a suggested size tier, the folders holding the most code files, the largest files with their component count, the repo patterns, and for expo-router or React Router apps the route files that hold more than wiring, and marks anything past the thresholds with `flag`. Every flagged folder or file is a `structure` finding (rule `S`) unless "Not a finding" in design.md exempts it; the layout section of design.md says how to judge and fix it.
 
 ### 2b. Size tier
 Decide the size tier per package and write it down; never leave it implicit. Start from the tier `layout` suggests and override it only with a stated reason (one feature with many generated files is still small; a 40-file app with six unrelated features is medium). The tier picks the target in section Targets.
@@ -39,7 +39,7 @@ Run `hotspots <package> 15`. The score combines size, 6-month churn, state hooks
 Bug pass: while reading, also record anything that looks like a real defect (a reset or invalidation that one code path ignores, a fallback to a fake value such as 0,0 or an empty id, an error swallowed, a stale closure). These are `bug` findings with severity by impact, never `minor`. If you cannot confirm it from the code you read, say "suspected" in the Problem and what to check.
 
 ### 3b. Repo patterns and decisions
-A repo pattern is a rule break the repo repeats on purpose or by habit: the same D rule or layout rule broken the same way in 3 or more units you read, or a `flag` on the repo patterns line of `layout` (several components per file across the repo). It is neither a convention to accept silently nor a pile of separate findings: write it as one finding whose Problem starts with `Repo pattern:`, names how many files show it with 2 or 3 examples, and whose Fix says what new and changed code should do instead. Name it in a few words (`several components per file`, `fetch in screens`).
+A repo pattern is a rule break the repo repeats on purpose or by habit: the same D rule or layout rule broken the same way in 3 or more units you read, or a `flag` on a repo patterns line of `layout` (several components per file, fat route files). It is neither a convention to accept silently nor a pile of separate findings: write it as one finding whose Problem starts with `Repo pattern:`, names how many files show it with 2 or 3 examples, and whose Fix says what new and changed code should do instead. Name it in a few words (`several components per file`, `fetch in screens`).
 
 Each pattern and a `layout` conflict from step 2b needs a decision. Read the `## Decisions` section of the conventions file (`paths` gives `conventions`); a line there looks like `- <name> · keep | gradual | now · <date> · <one-line reason>` (layout lines also carry the tier). Follow a recorded decision:
 - `keep`: the pattern is the repo's convention. Do not report it again; for `layout`, crowded folders and oversized files are still reported, with fixes inside the current style (split the file, sub-folders by concept in `lib/`) and no migration to the target.
@@ -63,7 +63,7 @@ Effort: S · Blast: low · Tests: none · Depends on: A1 (hard: reuses the Draft
 
 - Blast is how much breaks if the change is wrong: `low` (one screen or file), `medium` (several screens or a shared hook), `high` (app-wide state, public API, persisted data). Tests is whether existing tests cover the touched code: `yes`, `partial` or `none`; `none` means the batch starts with characterization tests.
 - Depends on lists only real dependencies. `hard: <reason>` means the later change cannot be done or reviewed without the earlier one (a type or module it uses is introduced there). `soft: <reason>` means it is easier or cleaner afterwards but can go first. If you cannot state the reason, there is no dependency. Write `none` when there is none.
-- Kind is `design`, `structure`, `bug` or `minor` (definitions in design.md). Rule IDs: D1–D10 for design and minor, `S` for structure, none for bugs. Label honestly; a severity or kind inflated to make a finding look important is a calibration failure.
+- Kind is `design`, `structure`, `bug` or `minor` (definitions in design.md). Rule IDs: D1–D9 and D11 for design, D10 for minor, `S` for structure, none for bugs. Label honestly; a severity or kind inflated to make a finding look important is a calibration failure.
 - Group findings into batches: each batch is one coherent change that can ship on its own (usually one unit or one theme), ordered so dependencies come first.
 - Minor findings need only Files, Problem, Fix and Effort, and sit in their own group and are never part of a recommended batch.
 - No evidence, no finding. Calibrate with "Not a finding"; an empty list for a package is a valid result.
@@ -134,4 +134,4 @@ Set up the boundary tool for the stack; commands and config are in [reference.md
 
 Record existing violations as a baseline so only new ones fail, and shrink it as batches land. Add a `lint:arch` script or keep the config at the root so the craft verify hook runs the check. Confirm with `echo '{}' | CRAFT_VERIFY=plan node "${CLAUDE_PLUGIN_ROOT}/hooks/verify.mjs"`.
 
-Design rules (D1–D10) are not enforceable by import tools; the reviewer agent checks them on every review.
+Design rules (D1–D11) are not enforceable by import tools; the reviewer agent checks them on every review.

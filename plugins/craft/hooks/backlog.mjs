@@ -1,6 +1,6 @@
 const SEVERITY = ["high", "medium", "low", "minor"];
 const KINDS = ["design", "structure", "bug", "minor"];
-const RULE = /^(?:D(?:10|[1-9])|S)(?:\s*,\s*(?:D(?:10|[1-9])|S))*$/;
+const RULE = /^(?:D(?:1[01]|[1-9])|S)(?:\s*,\s*(?:D(?:1[01]|[1-9])|S))*$/;
 const STATUS = /^(todo|in-progress|skipped.*|done.*)$/;
 const EFFORT_COST = { S: 1, M: 2, L: 3 };
 const SEVERITY_WEIGHT = { high: 3, medium: 2, low: 1, minor: 0 };
@@ -84,7 +84,7 @@ export function validate({ findings, problems: parseProblems }) {
     if (!f.kind) problems.push(`${where}: missing kind (${KINDS.join(", ")})`);
     if (f.kind === "minor" && f.severity !== "minor") problems.push(`${where}: kind minor needs severity minor`);
     if (f.severity === "minor" && f.kind && f.kind !== "minor") problems.push(`${where}: severity minor needs kind minor`);
-    if ((f.kind === "design" || f.kind === "minor") && !f.rules?.length) problems.push(`${where}: ${f.kind} findings need rule IDs (D1–D10)`);
+    if ((f.kind === "design" || f.kind === "minor") && !f.rules?.length) problems.push(`${where}: ${f.kind} findings need rule IDs (D1–D11)`);
     if (f.kind === "structure" && !f.rules?.includes("S")) problems.push(`${where}: structure findings use rule ID S`);
     if (!STATUS.test(f.status)) problems.push(`${where}: status must be todo, in-progress, done (<sha>) or skipped`);
     for (const key of ["Files", "Problem", "Fix"]) if (!f.fields[key]) problems.push(`${where}: missing ${key}`);

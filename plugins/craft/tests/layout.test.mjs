@@ -46,3 +46,50 @@ test("one shared file is not a repo pattern", () => {
   for (const screen of ["Home", "Profile", "Orders"]) files[`src/pages/${screen}.tsx`] = `export const ${screen} = () => null;\n`;
   assert.match(layout(makeRepo(files)), /^several components per file \(3\+\): 0 of 3 component files$/m);
 });
+
+const signals = (cwd, ...files) => spawnSync("node", [join(hooks, "repo.mjs"), "signals", ...files], { cwd, encoding: "utf8" }).stdout;
+const expo = { "package.json": { dependencies: { expo: "54", "expo-router": "6" } } };
+const fatScreen = ["Fit", "GoodFit", "ItemCard", "AltRow", "Falls"].map((n, i) => component(n, 30).replace(i ? "export " : "export function", i ? "" : "export default function")).join("\n");
+const thinRoute = (screen) => `import { ${screen} } from "../features/${screen.toLowerCase()}";\n\nexport default function Route() {\n  return <${screen} />;\n}\n`;
+
+test("a route file that holds the whole screen is flagged, thin routes and layouts are not", () => {
+  const files = {
+    ...expo,
+    "app/fit.tsx": fatScreen,
+    "app/plan.tsx": thinRoute("PlanScreen"),
+    "app/_layout.tsx": ["Root", "Tabs"].map((n) => component(n, 50)).join("\n"),
+    "app/+not-found.tsx": component("NotFound", 90),
+  };
+  const out = layout(makeRepo(files));
+  assert.match(out, /^\d+\t5\tapp\/fit\.tsx\tflag · 5 components, \d+ lines$/m);
+  assert.doesNotMatch(out, /app\/plan\.tsx\tflag|_layout\.tsx\tflag ·|not-found\.tsx\tflag ·/);
+  assert.match(out, /^fat route files: 1 of 2 route files$/m);
+});
+
+test("a route file exporting helpers is flagged; framework exports are allowed", () => {
+  const files = {
+    ...expo,
+    "app/a.tsx": `export function formatPlace(p: string) {\n  return p;\n}\nexport default function A() {\n  return null;\n}\n`,
+    "app/b.tsx": `export const unstable_settings = { initialRouteName: "index" };\nexport function ErrorBoundary() {\n  return null;\n}\nexport default function B() {\n  return null;\n}\n`,
+  };
+  const out = layout(makeRepo(files));
+  assert.match(out, /app\/a\.tsx\tflag · exports formatPlace$/m);
+  assert.doesNotMatch(out, /app\/b\.tsx\tflag/);
+});
+
+test("fat route files across the repo are flagged as a pattern", () => {
+  const files = { ...expo, "app/index.tsx": thinRoute("TodayScreen") };
+  for (const name of ["fit", "closet", "plan"]) files[`app/${name}.tsx`] = fatScreen;
+  assert.match(layout(makeRepo(files)), /^fat route files: 3 of 4 route files\tflag$/m);
+});
+
+test("route files only count when the app uses a file router", () => {
+  assert.doesNotMatch(layout(makeRepo({ "package.json": {}, "app/fit.tsx": fatScreen })), /route files/);
+});
+
+test("signals checks the changed files and names each reason", () => {
+  const repo = makeRepo({ ...expo, "app/plan.tsx": thinRoute("PlanScreen"), "app/fit.tsx": fatScreen });
+  assert.match(signals(repo), /^app\/fit\.tsx\tflag · many components: 5 in \d+ lines · fat route file: 5 components, \d+ lines$/m);
+  assert.doesNotMatch(signals(repo), /plan\.tsx/);
+  assert.match(signals(repo, "app/plan.tsx"), /^no flags in 1 file\(s\)$/m);
+});

@@ -1,6 +1,6 @@
 {
   "name": "craft",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Language-agnostic engineering discipline: a path per task type, adapt to the repo and its stack, improve what you touch, lean code, verified before done, human-style commits.",
   "author": {
     "name": "Ajdin"
