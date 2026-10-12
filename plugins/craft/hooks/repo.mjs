@@ -164,6 +164,49 @@ function components(file, text) {
   return 0;
 }
 
+const ROUTE_LINES_FLAG = 80;
+const ROUTE_COMPONENTS_FLAG = 2;
+const RESERVED_EXPORTS = new Set([
+  "ErrorBoundary", "unstable_settings", "generateStaticParams",
+  "loader", "action", "clientLoader", "clientAction", "meta", "links", "headers", "handle", "shouldRevalidate", "HydrateFallback", "Layout",
+]);
+const NAMED_EXPORT = /^export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+(\w+)/gm;
+const EXPORT_LIST = /^export\s*\{([^}]*)\}/gm;
+
+function deps(dir) {
+  const pkgs = [readJson("package.json"), dir ? readJson(`${dir}/package.json`) : null];
+  return Object.assign({}, ...pkgs.flatMap((p) => [p?.dependencies, p?.devDependencies]));
+}
+
+function routeMatcher(dir) {
+  const all = deps(dir);
+  const base = dir ? `${dir}/` : "";
+  const prefixes = [];
+  if ("expo-router" in all) prefixes.push(`${base}app/`, `${base}src/app/`);
+  if ("@react-router/dev" in all) prefixes.push(`${base}app/routes/`);
+  return (file) =>
+    /\.[jt]sx?$/.test(file) &&
+    prefixes.some((p) => file.startsWith(p)) &&
+    !/(^|\/)(_layout|\+[\w-]+)\.[jt]sx?$|\+api\.[jt]s$/.test(file) &&
+    !TEST.test(file);
+}
+
+function routeCheck(file, text, lines, count) {
+  const names = [...text.matchAll(NAMED_EXPORT)].map((m) => m[1]);
+  for (const m of text.matchAll(EXPORT_LIST)) {
+    for (const part of m[1].split(",")) {
+      const name = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/).pop();
+      if (name && name !== "default" && !/^type\s/.test(part.trim())) names.push(name);
+    }
+  }
+  const exports = names.filter((n) => !RESERVED_EXPORTS.has(n));
+  const reasons = [];
+  if (count >= ROUTE_COMPONENTS_FLAG) reasons.push(`${count} components`);
+  if (exports.length) reasons.push(`exports ${exports.join(", ")}`);
+  if (lines >= ROUTE_LINES_FLAG) reasons.push(`${lines} lines`);
+  return { exports, reasons, flag: reasons.length > 0 };
+}
+
 function layout(dir, limit) {
   const scope = dir && dir !== "." ? dir.replace(/\/$/, "") : "";
   const all = trackedFiles(scope);
@@ -177,13 +220,22 @@ function layout(dir, limit) {
     .map(([folder, count]) => ({ folder, count, flag: count >= FOLDER_FLAG }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
+  const isRoute = routeMatcher(scope);
   const measured = files.slice(0, 4000).map((file) => {
     const text = readFileSync(at(file), "utf8");
     const lines = text.split("\n").length;
     const count = components(file, text);
     const flag = lines >= FILE_LINES_FLAG || (count >= COMPONENTS_FLAG && lines >= COMPONENT_FILE_LINES);
-    return { file, lines, components: count, flag };
+    return { file, lines, components: count, flag, route: isRoute(file) ? routeCheck(file, text, lines, count) : null };
   });
+  const routeFiles = measured.filter((f) => f.route);
+  const fat = routeFiles.filter((f) => f.route.flag);
+  const routes = {
+    files: fat.sort((a, b) => b.lines - a.lines).slice(0, limit),
+    fat: fat.length,
+    of: routeFiles.length,
+    flag: fat.length >= PATTERN_MIN_FILES && fat.length >= routeFiles.length * PATTERN_SHARE,
+  };
   const withComponents = measured.filter((f) => f.components > 0 && !UI_KIT.test(f.file));
   const shared = withComponents.filter((f) => f.components >= SHARED_FILE_COMPONENTS);
   const sharing = {
@@ -193,7 +245,39 @@ function layout(dir, limit) {
     examples: shared.sort((a, b) => b.components - a.components).slice(0, 5).map((f) => f.file),
   };
   const sizes = measured.sort((a, b) => Number(b.flag) - Number(a.flag) || b.lines - a.lines).slice(0, limit);
-  return { codeFiles: all.length, tier: all.length <= SMALL_TIER_MAX ? "small" : "medium+", folders, files: sizes, sharing };
+  return { codeFiles: all.length, tier: all.length <= SMALL_TIER_MAX ? "small" : "medium+", folders, files: sizes, sharing, routes };
+}
+
+function changedFiles() {
+  const status = sh("git status --porcelain -uall", root);
+  if (!status.ok) return [];
+  return status.out
+    .split("\n")
+    .filter((line) => line && !line.startsWith(" D") && !line.startsWith("D "))
+    .map((line) => line.slice(3).split(" -> ").pop().replace(/^"|"$/g, ""))
+    .filter((f) => CODE.test(f) && !NOISE.test(f) && !TEST.test(f) && existsSync(at(f)));
+}
+
+function signals(files) {
+  const nested = packages().filter((p) => p.path !== ".");
+  const packageOf = (file) => nested.find((p) => file.startsWith(`${p.path}/`))?.path ?? "";
+  const counts = new Map();
+  for (const f of trackedFiles()) counts.set(posix.dirname(f), (counts.get(posix.dirname(f)) ?? 0) + 1);
+  return files.map((file) => {
+    const text = readFileSync(at(file), "utf8");
+    const lines = text.split("\n").length;
+    const count = components(file, text);
+    const reasons = [];
+    if (lines >= FILE_LINES_FLAG) reasons.push(`oversized: ${lines} lines`);
+    if (count >= COMPONENTS_FLAG && lines >= COMPONENT_FILE_LINES) reasons.push(`many components: ${count} in ${lines} lines`);
+    if (routeMatcher(packageOf(file))(file)) {
+      const route = routeCheck(file, text, lines, count);
+      if (route.flag) reasons.push(`fat route file: ${route.reasons.join(", ")}`);
+    }
+    const folder = counts.get(posix.dirname(file)) ?? 0;
+    if (folder >= FOLDER_FLAG) reasons.push(`crowded folder: ${folder} code files in ${posix.dirname(file)}`);
+    return { file, reasons };
+  });
 }
 
 function writeState(patch) {
@@ -223,7 +307,7 @@ if (command === "paths") {
   process.stdout.write(`${[`code files: ${codeFiles} · suggested depth: ${depth}`, "score\tlines\tcommits(6m)\tstate-hooks\tfan-in\tentry\tfile", ...lines].join("\n")}\n`);
 } else if (command === "layout") {
   const [dir = ".", limit = "8"] = args;
-  const { codeFiles, tier, folders, files, sharing } = layout(dir, Number(limit) || 8);
+  const { codeFiles, tier, folders, files, sharing, routes } = layout(dir, Number(limit) || 8);
   const mark = (flag) => (flag ? "\tflag" : "");
   process.stdout.write(
     `${[
@@ -238,7 +322,23 @@ if (command === "paths") {
       "",
       `repo patterns (flag at ${PATTERN_MIN_FILES}+ files and ${PATTERN_SHARE * 100}%+ of component files, UI kits excluded)`,
       `several components per file (${SHARED_FILE_COMPONENTS}+): ${sharing.files} of ${sharing.of} component files${mark(sharing.flag)}${sharing.examples.length ? ` · e.g. ${sharing.examples.join(", ")}` : ""}`,
+      ...(routes.of ? [`fat route files: ${routes.fat} of ${routes.of} route files${mark(routes.flag)}`] : []),
+      ...(routes.of
+        ? [
+            "",
+            `route files (flag at ${ROUTE_COMPONENTS_FLAG}+ components, exports besides the default and framework ones, or ${ROUTE_LINES_FLAG}+ lines)`,
+            ...(routes.files.length ? routes.files.map((f) => `${f.lines}\t${f.components}\t${f.file}\tflag · ${f.route.reasons.join(", ")}`) : ["none flagged"]),
+          ]
+        : []),
     ].join("\n")}\n`,
+  );
+} else if (command === "signals") {
+  const files = (args.length ? args.map((f) => f.replace(/^\.\//, "")) : changedFiles()).filter((f) => existsSync(at(f)));
+  const flagged = signals(files).filter((s) => s.reasons.length);
+  process.stdout.write(
+    files.length
+      ? `${flagged.length ? flagged.map((s) => `${s.file}\tflag · ${s.reasons.join(" · ")}`).join("\n") : `no flags in ${files.length} file(s)`}\n`
+      : "no changed code files\n",
   );
 } else if (command === "backlog") {
   const mode = args[0] ?? "roadmap";
@@ -254,6 +354,6 @@ if (command === "paths") {
   if (problems.length) process.stderr.write(`Backlog problems (fix with /craft:architect or edit ${context.findingsFile}):\n${problems.map((p) => `- ${p}`).join("\n")}\n\n`);
   process.stdout.write(renderRoadmap(roadmap(parsed)));
 } else {
-  process.stderr.write("Usage: repo.mjs [paths | stack | mark | packages | hotspots <dir> [limit] | layout <dir> [limit] | backlog [roadmap|check]]\n");
+  process.stderr.write("Usage: repo.mjs [paths | stack | mark | packages | hotspots <dir> [limit] | layout <dir> [limit] | signals [files] | backlog [roadmap|check]]\n");
   process.exit(1);
 }

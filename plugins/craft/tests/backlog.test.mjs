@@ -83,3 +83,7 @@ test("legacy dependency format counts as hard", () => {
   const result = roadmap(check(text).parsed);
   assert.deepEqual(result.sequence[1].needs, ["x"]);
 });
+
+test("D11 is a known design rule", () => {
+  assert.deepEqual(problems(file(finding("A1", { rules: "D11" }))), []);
+});
