@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: gradual-pattern-new-file
+description: "With 'several components per file · gradual' recorded in the repo's Decisions, a new component goes in its own file even though the page file it joins holds several."
+tags: [router, feature, layout]
+context:
+  scaffold_script: fixture.sh

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: assess-asks-about-repo-pattern
+description: "Well-foldered FSD app where most page files hold 3-4 components; assess must report one repo-pattern finding and leave keep / gradual / now open instead of treating it as convention."
+tags: [architect, calibration, layout]
+context:
+  scaffold_script: fixture.sh
