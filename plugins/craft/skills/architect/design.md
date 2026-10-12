@@ -3,7 +3,7 @@
 Apply each rule to a unit you have read end to end. A finding needs evidence: file, line range, and what you saw. Cite the rule ID.
 
 Kinds:
-- **design**: a D1–D9 rule below is broken.
+- **design**: a D1–D9 or D11 rule below is broken.
 - **structure**: cycles, wrong-way imports, monorepo boundary breaks, and layout problems (see Layout below).
 - **bug**: wrong behavior you can describe concretely (input, what happens, what should happen). Bugs found while reading are worth reporting, but label them as bugs and never attach a D rule to one.
 - **minor**: local hygiene (D10, wording, small duplication). Never part of a recommended batch.
@@ -34,6 +34,7 @@ Fix: a hook or use case that owns the effect and exposes intent-level functions 
 
 ## D6 · Thin entry points
 Route files, page components, controllers, Activities or screen Composables that contain logic instead of wiring.
+A file-router route (expo-router `app/`, React Router `app/routes/`, Next.js `page.tsx`) is thin when it has one default export that reads params and renders a screen from a feature or page folder, defines no other components or helpers, and exports nothing else besides the framework's own names (`ErrorBoundary`, `unstable_settings`, `generateStaticParams`, `loader`, `action`, `meta`, `metadata`). Nothing imports from a route file. For expo-router and React Router apps, `repo.mjs layout` and `signals` flag a route with 2 or more components, other exports, or 80 or more lines.
 Fix: the entry point only reads params and renders or calls the slice or module that owns the work.
 
 ## D7 · Build each mapping once
@@ -48,6 +49,12 @@ Fix: move to the entity or module that owns the concept (`entities/item`, `modul
 The same decision repeated across screens or handlers: error kind to user action, auth or plan gating, retry rules.
 Fix: extract only after confirming it is repeated (search the repo); one hook or middleware owns it.
 
+## D11 · Views render a prepared view
+A component that works out what to show from domain data itself: filtering or searching the domain object's collections, choosing between domain cases, parsing or rebuilding strings, comparing dates, picking copy from domain fields. The signal is three or more such values computed in one component body, or a helper in a component file that takes a domain object and returns display data. These rules hide in JSX, cannot be unit-tested without rendering, and get copied when a second screen needs them.
+Fix: pure functions next to the feature that turn domain data into a view (`toFitView(rec, units, now)` returning `{ items, tip, missing, title }`), with plain unit tests. When the screen also needs hooks (store, navigation, mutations), one view-model hook (`useFitScreen()`) composes them and returns `{ view, actions }`; the components only lay out `view` and call `actions`. The hook stays thin: rules live in the pure functions it calls.
+Not D11: formatting a single value (`formatClock(t)`), showing or hiding on a prop or flag, one lookup, or derivation that already calls a named function.
+Dependency injection: in React and React Native, hooks, props and module imports are the seams, and tests mock modules at the boundary. Do not recommend a DI container or service locator; a port (interface plus adapter) only where an implementation is really swapped (a vendor SDK, a platform API, a fake for tests that module mocks cannot reach).
+
 ## D10 · Visible invariants (minor)
 Non-null assertions, unchecked casts, promises without error handling, ignored results, magic values.
 Fix: a type, an early return or explicit handling that makes the rule visible.
@@ -57,6 +64,7 @@ Structure findings from `repo.mjs layout`, rule `S`. The question is whether som
 - **Crowded folder**: 20 or more code files directly in one folder, unless the folder's own role keeps them together (a route folder shaped by the framework, a migrations folder, a UI kit of primitives). Check what the files are about: unrelated concerns side by side (auth, billing, settings, formatting in one `lib/`) is the finding. Fix: group by the feature or entity each file serves; what has no business meaning goes to `shared/` sub-folders by purpose (`api`, `lib`, `ui`).
 - **Many components in one file**: 5 or more components in a file of 150 lines or more. Fix: one file per component that has its own state, props or reason to change, in a folder named after the screen or feature (`settings/ui/NotificationsCard.tsx`); tiny private helpers used only by one component can stay with it.
 - **Several components per file, repo-wide**: the repo patterns line of `layout` flags it when 3 or more files, and at least a quarter of the files with components (UI kits excluded), hold 3 or more components each. One file per component makes each one findable by name and changeable on its own (single responsibility at file level). Report it as one repo pattern, not one finding per file, severity `low` (`medium` if the files are also long or edited by several features). The user decides whether it stays. A UI kit of small primitives in one file does not count toward it.
+- **Fat route file**: the route files section of `layout` flags a file-router route with 2 or more components, exports besides the default and the framework's own, or 80 or more lines. It is a D6 problem; report it with the screen folder it moves to (`features/fit/FitScreen.tsx`, or `pages/fit/ui/` under FSD) and any D11 logic found inside. When the repo patterns line flags `fat route files` (3 or more route files and at least a quarter of them), it is one repo pattern, decided once like several components per file.
 - **Oversized file**: 400 lines or more. Usually a D1 problem in disguise; read it and report the responsibilities, or say why it is one concern (a long form layout).
 Severity: medium when it slows every change to the area (a crowded folder that every feature touches, a file several screens edit), minor when it is one isolated file. Never high on its own.
 
@@ -68,7 +76,7 @@ Calibration matters as much as detection. Do not report:
 - Missing abstractions with only one use today.
 - Styling choices (inline styles versus style sheets) and formatting.
 - A different but consistent pattern the repo uses everywhere that breaks no rule here: that is a convention, not a defect. A pattern that does break a rule (a D rule or the Layout thresholds) is a repo pattern: one finding, and the user decides once whether to keep it, change it gradually or change it now (craft:architect, assess step 3b). A `keep` line in `## Decisions` of the conventions file makes it a convention.
-- A component, screen or controller that renders and wires named hooks, use cases or services: coordinating them is its one responsibility. D1 applies only when the unit implements the concerns itself.
+- A component, screen or controller that renders and wires named hooks, use cases or services: coordinating them is its one responsibility. D1 applies only when the unit implements the concerns itself. A screen that computes its view from domain data inline is not wiring (D11), and a route file that defines the whole screen is not thin (D6).
 - A screen's own controller hook or ViewModel that holds the screen state and turns user intents into feedback for that screen (messages, confirmation dialogs, navigation): that is the screen's coordination. Flag it only when it also implements I/O, device access or domain rules itself.
 - Calling the same pure helper twice: D7 is about rebuilding the same structure by hand in several places.
 - Where user-facing wording lives, analytics event details, hard-coded config in a small app: minor at most.
@@ -83,8 +91,9 @@ Short signals per stack. Each stack pack in `${CLAUDE_PLUGIN_ROOT}/stacks/` adds
 - D2: five or more `useState` calls for one form or entity; a function that calls most of the same setters as an effect.
 - D4: `useEffect` that calls setters from props or loaded data; `useRef` used as a "loaded once" guard.
 - D5: `ImagePicker`, `Permissions`, `fetch` or API client, `AsyncStorage`, `track(...)` called directly in a screen component.
-- D6: an expo-router or React Router route file defining the whole screen.
-- Fix shapes: `useXForm` returning the model and intent functions; a `useSaveX` mutation owning API, cache refresh and analytics.
+- D6: an expo-router or React Router route file defining the whole screen, holding several components, or exporting helpers.
+- D11: `rec.items.filter(...)`, `.find(...)`, `.split(",")[0]` or date comparisons on domain data inside a component body; a `function detailFor(kind, rec)` helper below the components.
+- Fix shapes: `useXForm` returning the model and intent functions; a `useSaveX` mutation owning API, cache refresh and analytics; `toXView(entity)` pure selectors plus a `useXScreen()` view-model hook returning `{ view, actions }`.
 
 **Next.js**
 - D6: `page.tsx` or a route handler containing data mapping, validation and business rules.

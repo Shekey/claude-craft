@@ -10,7 +10,10 @@ Read before writing code in a React Native or Expo app. The repo's conventions, 
 - Tests: jest-expo or the `react-native` Jest preset with React Native Testing Library. Lint: ESLint (`eslint-config-expo`) or Biome.
 
 ## Rules
-- Route files stay thin: read params, render the screen component from the feature or page module (D6).
+- Route files stay thin: one default export that reads params and renders the screen from the feature or page folder (`app/fit.tsx` renders `features/fit/FitScreen`). No other components, helpers or constants in the route file, and no exports besides the default and expo-router's own (`ErrorBoundary`, `unstable_settings`, `generateStaticParams`); extra exports also make Fast Refresh reload the whole module. Nothing imports from `app/` (D6).
+- A screen folder holds the screen, one file per component that has its own props or reason to change, and the screen's logic: `features/fit/FitScreen.tsx`, `GoodFit.tsx`, `ItemCard.tsx`, `fit-view.ts` (+ `fit-view.test.ts`), `useFitScreen.ts`.
+- Components render a prepared view. Deriving what to show from domain data (filtering its lists, picking a case, parsing strings, date comparisons) goes in pure functions next to the screen; a view-model hook (`useFitScreen()`) composes the store, mutations and navigation and returns `{ view, actions }` (D11).
+- No DI container. Hooks, props and module imports are the seams; tests mock modules (`jest.mock`). Add a port only for something really swapped, such as a vendor SDK or a platform API.
 - Device APIs (camera, image picker, location, notifications, permissions, secure storage) live in a hook per capability that returns intent-level functions and a typed status (`useCameraPermission()` → `{ status, request }`). Screens never call `ImagePicker` or `Location` directly (D5).
 - Permissions are a state machine: `undetermined | granted | denied | blocked`; handle "blocked" with a link to settings.
 - Server data lives in the query cache, not copied into `useState` with an effect (D4). Mutations own the API call, cache invalidation and analytics.
@@ -25,8 +28,10 @@ Read before writing code in a React Native or Expo app. The repo's conventions, 
 - D3: `isLoading`, `error`, `data` and `isEmpty` as separate flags; photo `uri` plus `existing` plus `removed` booleans.
 - D4: `useEffect(() => setX(props.x), [props.x])`; a `useRef` "loaded once" guard around form initialisation.
 - D5: `fetch`, the API client, `AsyncStorage`, `track()` or `router.push` decisions inline in a screen.
+- D6: a file in `app/` that defines the screen's components, holds helpers, exports anything besides the default, or runs to 80+ lines (`repo.mjs layout` lists them under route files).
+- D11: `.filter`, `.find`, `.split(...)[0]`, date comparisons or copy chosen from domain fields in a component body; a `detailFor(kind, entity)` helper below the components.
 - D8: entity rules (price, status transitions) in `utils/` or `lib/`.
-- Not a finding: a screen that renders and wires its own hooks; inline styles when the repo uses them.
+- Not a finding: a screen component (not a route file) that renders and wires named hooks and calls named view functions; formatting a single value inline; inline styles when the repo uses them.
 
 ## Boundaries
 - Small app: feature folders. Growing app: Feature-Sliced Design with expo-router `app/` as thin routes over `src/pages` (see `craft:architect` reference).
@@ -34,7 +39,7 @@ Read before writing code in a React Native or Expo app. The repo's conventions, 
 - Native code in a committed `android/` folder follows the Kotlin pack and is verified with Gradle.
 
 ## Tests
-- Logic (mappers, reducers, validation, state machines) as plain unit tests: fastest and most valuable.
+- Logic (mappers, view functions, reducers, validation, state machines) as plain unit tests: fastest and most valuable.
 - Hooks with `renderHook`; screens with React Native Testing Library by role and text, not test IDs or snapshots.
 - Mock native modules at the module boundary (`jest.mock("expo-image-picker")`), never the hook under test.
 

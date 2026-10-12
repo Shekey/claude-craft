@@ -52,6 +52,6 @@ Finally run `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" mark` to record the com
 Only create `.claude/` files inside the repo when the user wants to share them with the team.
 
 Rules while implementing:
-- Mirror the closest existing example, even where you would design it differently. The exception is a `gradual` or `now` line in `## Decisions`: new code follows the decided rule there, not the old pattern (for "several components per file", a new component gets its own file even if its neighbours share one).
+- Mirror the closest existing example, even where you would design it differently. Two exceptions: a `gradual` or `now` line in `## Decisions`, where new code follows the decided rule, not the old pattern (for "several components per file", a new component gets its own file even if its neighbours share one); and a new file that `repo.mjs signals` would flag, which follows the rule unless a `keep` line covers it (a new route renders a screen from a feature folder even when other routes hold their screens). Existing files are only moved per `## Decisions`.
 - When conventions are inconsistent, follow the newest code in the area you are touching.
 - Raise disagreements with the architecture in the plan; do not act on them unasked.
