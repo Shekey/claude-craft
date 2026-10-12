@@ -1,15 +1,25 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ComponentProps, ReactNode } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, type TextStyle, View, type ViewStyle } from "react-native";
+import { useRouter } from "expo-router";
 import { color, type } from "../theme/theme";
 
 export type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 type Tone = "default" | "warn";
+const BUTTON_BG = { primary: color.accent, soft: color.surface, text: "transparent" } as const;
 
 export const Page = ({ children, bottomPad = 24 }: { children: ReactNode; bottomPad?: number }) => (
   <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: bottomPad }}>{children}</ScrollView>
 );
-export const TopBar = ({ back }: { back?: boolean }) => <View style={{ height: back ? 44 : 0 }} />;
+export const TopBar = ({ back }: { back?: boolean }) => {
+  const router = useRouter();
+  if (!back) return null;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={{ height: 44, justifyContent: "center" }}>
+      <MaterialCommunityIcons name="chevron-left" size={28} color={color.body} />
+    </Pressable>
+  );
+};
 export const Heading = ({ title, subtitle }: { title: string; subtitle?: string }) => (
   <View style={{ gap: 6 }}>
     <Text style={type.title}>{title}</Text>
@@ -43,7 +53,13 @@ export const Row = ({ icon, title, detail, tone = "default" }: { icon: IconName;
   </View>
 );
 export const Button = ({ label, onPress, busy, kind = "primary" }: { label: string; onPress: () => void; busy?: boolean; kind?: "primary" | "soft" | "text" }) => (
-  <Pressable accessibilityRole="button" onPress={onPress} disabled={busy} style={{ minHeight: 48, justifyContent: "center", opacity: kind === "text" ? 0.8 : 1 }}>
-    {busy ? <ActivityIndicator /> : <Text style={type.title}>{label}</Text>}
+  <Pressable
+    accessibilityRole="button"
+    accessibilityState={{ busy, disabled: busy }}
+    onPress={onPress}
+    disabled={busy}
+    style={{ minHeight: 48, justifyContent: "center", alignItems: "center", borderRadius: 14, backgroundColor: BUTTON_BG[kind] }}
+  >
+    {busy ? <ActivityIndicator /> : <Text style={[type.title, { color: kind === "primary" ? "#fff" : color.accent }]}>{label}</Text>}
   </Pressable>
 );
