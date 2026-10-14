@@ -65,7 +65,7 @@ Structure findings from `repo.mjs layout`, rule `S`. The question is whether som
 - **Crowded folder**: 20 or more code files directly in one folder, unless the folder's own role keeps them together (a route folder shaped by the framework, a migrations folder, a UI kit of primitives). Check what the files are about: unrelated concerns side by side (auth, billing, settings, formatting in one `lib/`) is the finding. Fix: group by the feature or entity each file serves; what has no business meaning goes to `shared/` sub-folders by purpose (`api`, `lib`, `ui`).
 - **Many components in one file**: 5 or more components in a file of 150 lines or more. Fix: one file per component that has its own state, props or reason to change, in a folder named after the screen or feature (`settings/ui/NotificationsCard.tsx`); tiny private helpers used only by one component can stay with it.
 - **Several components per file, repo-wide**: the repo patterns line of `layout` flags it when 3 or more files, and at least a quarter of the files with components (UI kits excluded), hold 3 or more components each. One file per component makes each one findable by name and changeable on its own (single responsibility at file level). Report it as one repo pattern, not one finding per file, severity `low` (`medium` if the files are also long or edited by several features). The user decides whether it stays. A UI kit of small primitives in one file does not count toward it.
-- **Screen in a route file**: the route files section of `layout` flags a file-router route that does more than render a screen (see D6 for the test). It is a D6 problem whatever its length; report it with the screen folder it moves to (`features/onboarding/OnboardingScreen.tsx`, or `pages/onboarding/ui/` under FSD) and any D11 logic found inside. One such route among thin ones is a finding; when the repo patterns line flags `screens in route files` (2 or more), the repo has two route styles side by side, and that is one repo pattern decided once (keep, gradual or now) so the repo ends up with one style.
+- **Screen in a route file**: a route `layout` flags under route files (test in D6). Report it with the screen folder it moves to (`features/onboarding/OnboardingScreen.tsx`, or `pages/onboarding/ui/` under FSD) and any D11 logic inside. One such route is a finding; when the patterns line flags `screens in route files`, it is one repo pattern decided once (keep, gradual or now).
 - **Oversized file**: 400 lines or more. Usually a D1 problem in disguise; read it and report the responsibilities, or say why it is one concern (a long form layout).
 Severity: medium when it slows every change to the area (a crowded folder that every feature touches, a file several screens edit), minor when it is one isolated file. Never high on its own.
 
@@ -86,29 +86,10 @@ If the units you read have no high or medium findings, say so plainly. Do not pa
 
 ## Stack signals
 
-Short signals per stack. Each stack pack in `${CLAUDE_PLUGIN_ROOT}/stacks/` adds more, with the stack's boundary tool.
-
-**React / React Native**
-- D2: five or more `useState` calls for one form or entity; a function that calls most of the same setters as an effect.
-- D4: `useEffect` that calls setters from props or loaded data; `useRef` used as a "loaded once" guard.
-- D5: `ImagePicker`, `Permissions`, `fetch` or API client, `AsyncStorage`, `track(...)` called directly in a screen component.
-- D6: a file-router route defining the whole screen, holding several components, or exporting helpers.
-- D11: `rec.items.filter(...)`, `.find(...)`, `.split(",")[0]` or date comparisons on domain data inside a component body; a `function detailFor(kind, rec)` helper below the components.
-- Fix shapes: `useXForm` returning the model and intent functions; a `useSaveX` mutation owning API, cache refresh and analytics; `toXView(entity)` pure selectors plus a `useXScreen()` view-model hook returning `{ view, actions }`.
-
-**Next.js**
-- D6: `page.tsx` or a route handler containing data mapping, validation and business rules.
-- D5: data fetched in client components with `useEffect` when a server component or server action fits; `"use client"` at the top of a large tree.
-- Fix shapes: fetch in server components or a query layer, push `"use client"` down to the interactive leaf, validate server action input with a schema at the boundary.
+Each stack pack in `${CLAUDE_PLUGIN_ROOT}/stacks/` lists its own design signals and fix shapes; read the pack for the code you are judging. Plain Node backends have no pack:
 
 **Node backend**
 - D6: controllers or route handlers that contain business rules or SQL.
 - D5 and D1: services that read `req` or `res`, or that send email, write to the database and call third parties in one function.
 - D8: shared `utils` holding order or billing rules.
 - Fix shapes: handler parses and validates, a use case per operation, repositories own persistence, external systems behind a port only when they need faking or swapping.
-
-**Kotlin / Android**
-- D2 and D3: a ViewModel exposing several `StateFlow`s or `mutableStateOf` fields for one screen instead of one `UiState`; loading, error and content flags instead of a sealed interface.
-- D5: `Context`, Retrofit or Room calls in a Composable or an Activity; ViewModel holding Android framework references.
-- D6: an Activity or Fragment with business logic.
-- Fix shapes: one `UiState` data class or sealed interface, a stateless screen Composable with hoisted state, repositories behind the ViewModel, side effects in `LaunchedEffect` only for UI events.

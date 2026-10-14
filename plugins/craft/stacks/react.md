@@ -12,7 +12,7 @@ Read before writing code in a React web app (Vite, React Router framework mode, 
 ## Rules
 - Components render; hooks own state and effects; plain functions own logic. A component file that does all three is a D1 candidate.
 - Components render a prepared view: deriving what to show from domain data (filtering its lists, picking a case, parsing strings, date comparisons) goes in pure functions next to the feature, with unit tests; when a screen also composes hooks, one view-model hook (`useCheckoutScreen()`) returns `{ view, actions }` (D11).
-- File-router routes (React Router `app/routes/`, TanStack Router route files) stay thin: one default export (plus the router's own exports such as `loader`, `action`, `meta`) that renders a page from a feature or page folder; no other components or helpers in the route file, and nothing imports from it (D6).
+- File-router routes (React Router `app/routes/`, TanStack Router `src/routes/`) stay thin (design.md D6): they render a page from a feature or page folder, plus the router's own exports (`loader`, `action`, `meta`, `Route`); nothing imports from them.
 - No DI container. Hooks, props, context and module imports are the seams; tests mock modules or the network. Add a port only for something really swapped.
 - Effects are for syncing with something outside React (subscriptions, the DOM, timers). Not for deriving state, not for reacting to events, not for fetching when the repo has a data layer (D4, D5).
 - Derive during render instead of syncing state, through named functions once the derivation is more than a lookup or a format call. Initialise state from props once and remount with `key` when identity changes; never mirror props into state.
@@ -27,7 +27,7 @@ Read before writing code in a React web app (Vite, React Router framework mode, 
 - D3: `loading`/`error`/`data` booleans instead of one status union; `isOpen` plus `selectedId` that can disagree.
 - D4: `useEffect(() => setX(f(props)), [props])`; effects chained to update each other.
 - D5: `fetch`, `localStorage`, analytics or navigation decisions inline in components.
-- D6: a route file defining the page's components, exporting helpers, holding state or calling app hooks, however short. Thin routes next to routes holding their page is a repo pattern for the keep / gradual / now decision.
+- D6: a route file that does more than render a page, however short. Two route styles side by side is a repo pattern for the keep / gradual / now decision.
 - D9: the same error toast mapping in many components.
 - D11: three or more values derived from a domain object inside one component body; a helper below the components that takes the entity and returns display text.
 - Not a finding: a large component with one responsibility; prop drilling two levels deep.
