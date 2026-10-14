@@ -146,6 +146,8 @@ function nodeSteps({ dir, files }, lintAndTypesDone) {
 
     const typecheck = ["typecheck", "type-check", "tsc"].find((s) => scripts[s]);
     if (typecheck) add(dir, run(typecheck), "check");
+    else if ("nuxt" in deps) add(dir, `${exec} nuxi typecheck`, "check");
+    else if ("vue-tsc" in deps) add(dir, `${exec} vue-tsc --noEmit`, "check");
     else if (exists(dir, "tsconfig.json")) add(dir, `${exec} tsc --noEmit -p tsconfig.json`, "check");
   }
 

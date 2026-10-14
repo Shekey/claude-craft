@@ -65,10 +65,13 @@ function stackSection() {
     writeFileSync(context.stateFile, `${JSON.stringify({ ...context.state, stacks }, null, 2)}\n`);
   }
   if (!stacks.length) return "";
-  const lines = stacks.map(({ stack, dirs, pack }) => {
+  const packPath = (file) => join(pluginRoot, "stacks", file);
+  const lines = stacks.map(({ stack, dirs, pack, extras }) => {
     const shown = dirs.slice(0, 4).map((d) => d || ".");
     const where = dirs.length > 4 ? `${shown.join(", ")} and ${dirs.length - 4} more` : shown.join(", ");
-    return pack ? `- ${stack} (${where}): read ${join(pluginRoot, "stacks", pack)} before writing code there` : `- ${stack} (${where}): no stack pack, follow the conventions`;
+    const also = extras.length ? `, then ${extras.map(packPath).join(" and ")}` : "";
+    if (pack) return `- ${stack} (${where}): read ${packPath(pack)}${also} before writing code there`;
+    return extras.length ? `- ${stack} (${where}): read ${extras.map(packPath).join(" and ")} for the libraries it uses` : `- ${stack} (${where}): no stack pack, follow the conventions`;
   });
   return `# Stacks in this repo\n${lines.join("\n")}\nThe repo's conventions and config win over a stack pack wherever they differ.`;
 }

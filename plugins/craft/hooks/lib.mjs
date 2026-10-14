@@ -107,11 +107,16 @@ export const MARKERS = {
 export const PACKS = {
   "react-native": "react-native.md",
   next: "nextjs.md",
+  "tanstack-start": "tanstack.md",
   react: "react.md",
+  nuxt: "vue-nuxt.md",
+  vue: "vue-nuxt.md",
   nestjs: "nestjs.md",
   kotlin: "kotlin-java.md",
   java: "kotlin-java.md",
 };
+
+const REACT_WEB = new Set(["next", "tanstack-start"]);
 
 const JVM_BUILD = new Set(["settings.gradle.kts", "settings.gradle", "build.gradle.kts", "build.gradle", "pom.xml"]);
 const IGNORED = /(^|\/)(node_modules|vendor|dist|build|\.next|\.expo|fixtures?|__fixtures__|evals?|examples?|testdata)\//;
@@ -119,10 +124,21 @@ const IGNORED = /(^|\/)(node_modules|vendor|dist|build|\.next|\.expo|fixtures?|_
 function nodeStack(pkg) {
   const deps = { ...pkg.peerDependencies, ...pkg.devDependencies, ...pkg.dependencies };
   if ("expo" in deps || "react-native" in deps) return "react-native";
+  if ("nuxt" in deps) return "nuxt";
   if ("next" in deps) return "next";
+  if ("@tanstack/react-start" in deps) return "tanstack-start";
   if ("@nestjs/core" in deps) return "nestjs";
   if ("react" in deps) return "react";
+  if ("vue" in deps) return "vue";
   return "node";
+}
+
+function extraPacks(stack, pkg) {
+  const deps = { ...pkg.peerDependencies, ...pkg.devDependencies, ...pkg.dependencies };
+  const extras = [];
+  if (REACT_WEB.has(stack)) extras.push(PACKS.react);
+  if (stack !== "tanstack-start" && Object.keys(deps).some((d) => d.startsWith("@tanstack/"))) extras.push(PACKS["tanstack-start"]);
+  return extras;
 }
 
 export function detectStacks(root) {
@@ -131,16 +147,19 @@ export function detectStacks(root) {
   const dirOf = (file) => (posix.dirname(file) === "." ? "" : posix.dirname(file));
   const inside = (file, dir) => !dir || file.startsWith(`${dir}/`);
   const stacks = new Map();
-  const add = (stack, dir) => {
+  const extras = new Map();
+  const add = (stack, dir, more = []) => {
     if (!stacks.has(stack)) stacks.set(stack, []);
     if (!stacks.get(stack).includes(dir)) stacks.get(stack).push(dir);
+    extras.set(stack, [...new Set([...(extras.get(stack) ?? []), ...more])]);
   };
 
   for (const file of files.filter((f) => posix.basename(f) === "package.json")) {
     const dir = dirOf(file);
     const pkg = readJsonFile(join(root, file));
     if (pkg.workspaces || existsSync(join(root, dir, "pnpm-workspace.yaml"))) continue;
-    add(nodeStack(pkg), dir);
+    const stack = nodeStack(pkg);
+    add(stack, dir, extraPacks(stack, pkg));
   }
 
   const jvmDirs = [...new Set(files.filter((f) => JVM_BUILD.has(posix.basename(f))).map(dirOf))].sort((a, b) => a.length - b.length);
@@ -152,5 +171,5 @@ export function detectStacks(root) {
     add(kotlin ? "kotlin" : "java", dir);
   }
 
-  return [...stacks].map(([stack, dirs]) => ({ stack, dirs: dirs.sort(), pack: PACKS[stack] ?? null }));
+  return [...stacks].map(([stack, dirs]) => ({ stack, dirs: dirs.sort(), pack: PACKS[stack] ?? null, extras: extras.get(stack) }));
 }

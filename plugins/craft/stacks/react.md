@@ -1,12 +1,12 @@
-# Stack pack: React (web, without Next.js)
+# Stack pack: React (web)
 
-Read before writing code in a React web app (Vite, CRA, Remix/React Router framework, or a React package). The repo's conventions, config and existing code win wherever they differ from this pack. Never add a library from here to a repo that doesn't already use it, unless the task asks.
+Read before writing code in a React web app (Vite, React Router framework mode, or a React package). Next.js and TanStack Start apps read their own pack first and this one for component rules; their pack wins on routing and data loading. The repo's conventions, config and existing code win wherever they differ from this pack. Never add a library from here to a repo that doesn't already use it, unless the task asks.
 
 ## First, find out what the repo uses
 - React version (19 brings actions, `useActionState`, `use`, ref as a prop) and whether the React Compiler is on (then manual `useMemo`/`useCallback` is mostly noise).
 - Routing: React Router (library or framework mode), TanStack Router, or none.
 - Server state: TanStack Query, RTK Query, SWR, loaders. Client state: Zustand, Redux, Jotai, context.
-- Forms and validation, styling (Tailwind, CSS modules, CSS-in-JS), component library.
+- Forms and validation, styling (Tailwind, CSS modules, CSS-in-JS), component library (shadcn/ui when `components.json` exists: add components with its CLI, then adapt them in place).
 - Tests: Vitest or Jest with Testing Library; Playwright or Cypress. Lint: ESLint with `react-hooks` rules, or Biome.
 
 ## Rules
