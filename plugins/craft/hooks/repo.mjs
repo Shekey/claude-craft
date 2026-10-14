@@ -166,6 +166,11 @@ function components(file, text) {
 
 const ROUTE_LINES_FLAG = 80;
 const ROUTE_COMPONENTS_FLAG = 2;
+const ROUTE_ELEMENTS_FLAG = 4;
+const ROUTE_PATTERN_MIN = 2;
+const PARAM_HOOKS = new Set(["useLocalSearchParams", "useGlobalSearchParams", "useSearchParams", "useParams", "useLoaderData", "useActionData"]);
+const HOOK_CALL = /\b(use[A-Z]\w*)\s*(?:<[^>()]*>)?\s*\(/g;
+const JSX_OPEN = /(?:^|[\s({>?:&|])<([A-Za-z][\w.]*)/g;
 const RESERVED_EXPORTS = new Set([
   "ErrorBoundary", "unstable_settings", "generateStaticParams",
   "loader", "action", "clientLoader", "clientAction", "meta", "links", "headers", "handle", "shouldRevalidate", "HydrateFallback", "Layout",
@@ -200,9 +205,13 @@ function routeCheck(file, text, lines, count) {
     }
   }
   const exports = names.filter((n) => !RESERVED_EXPORTS.has(n));
+  const hooks = [...new Set([...text.matchAll(HOOK_CALL)].map((m) => m[1]).filter((h) => !PARAM_HOOKS.has(h)))];
+  const elements = [...text.matchAll(JSX_OPEN)].length;
   const reasons = [];
   if (count >= ROUTE_COMPONENTS_FLAG) reasons.push(`${count} components`);
   if (exports.length) reasons.push(`exports ${exports.join(", ")}`);
+  if (hooks.length) reasons.push(`calls ${hooks.join(", ")}`);
+  if (elements >= ROUTE_ELEMENTS_FLAG) reasons.push(`renders ${elements} elements`);
   if (lines >= ROUTE_LINES_FLAG) reasons.push(`${lines} lines`);
   return { exports, reasons, flag: reasons.length > 0 };
 }
@@ -234,7 +243,7 @@ function layout(dir, limit) {
     files: fat.sort((a, b) => b.lines - a.lines).slice(0, limit),
     fat: fat.length,
     of: routeFiles.length,
-    flag: fat.length >= PATTERN_MIN_FILES && fat.length >= routeFiles.length * PATTERN_SHARE,
+    flag: fat.length >= ROUTE_PATTERN_MIN,
   };
   const withComponents = measured.filter((f) => f.components > 0 && !UI_KIT.test(f.file));
   const shared = withComponents.filter((f) => f.components >= SHARED_FILE_COMPONENTS);
@@ -272,7 +281,7 @@ function signals(files) {
     if (count >= COMPONENTS_FLAG && lines >= COMPONENT_FILE_LINES) reasons.push(`many components: ${count} in ${lines} lines`);
     if (routeMatcher(packageOf(file))(file)) {
       const route = routeCheck(file, text, lines, count);
-      if (route.flag) reasons.push(`fat route file: ${route.reasons.join(", ")}`);
+      if (route.flag) reasons.push(`screen in route file: ${route.reasons.join(", ")}`);
     }
     const folder = counts.get(posix.dirname(file)) ?? 0;
     if (folder >= FOLDER_FLAG) reasons.push(`crowded folder: ${folder} code files in ${posix.dirname(file)}`);
@@ -322,11 +331,11 @@ if (command === "paths") {
       "",
       `repo patterns (flag at ${PATTERN_MIN_FILES}+ files and ${PATTERN_SHARE * 100}%+ of component files, UI kits excluded)`,
       `several components per file (${SHARED_FILE_COMPONENTS}+): ${sharing.files} of ${sharing.of} component files${mark(sharing.flag)}${sharing.examples.length ? ` · e.g. ${sharing.examples.join(", ")}` : ""}`,
-      ...(routes.of ? [`fat route files: ${routes.fat} of ${routes.of} route files${mark(routes.flag)}`] : []),
+      ...(routes.of ? [`screens in route files (${ROUTE_PATTERN_MIN}+): ${routes.fat} of ${routes.of} route files, ${routes.of - routes.fat} thin${mark(routes.flag)}`] : []),
       ...(routes.of
         ? [
             "",
-            `route files (flag at ${ROUTE_COMPONENTS_FLAG}+ components, exports besides the default and framework ones, or ${ROUTE_LINES_FLAG}+ lines)`,
+            `route files (thin: one default export rendering a screen, params read at most; flag at ${ROUTE_COMPONENTS_FLAG}+ components, other exports, hooks besides params, ${ROUTE_ELEMENTS_FLAG}+ JSX elements, or ${ROUTE_LINES_FLAG}+ lines)`,
             ...(routes.files.length ? routes.files.map((f) => `${f.lines}\t${f.components}\t${f.file}\tflag · ${f.route.reasons.join(", ")}`) : ["none flagged"]),
           ]
         : []),

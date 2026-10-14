@@ -28,7 +28,7 @@ Read before writing code in a React Native or Expo app. The repo's conventions, 
 - D3: `isLoading`, `error`, `data` and `isEmpty` as separate flags; photo `uri` plus `existing` plus `removed` booleans.
 - D4: `useEffect(() => setX(props.x), [props.x])`; a `useRef` "loaded once" guard around form initialisation.
 - D5: `fetch`, the API client, `AsyncStorage`, `track()` or `router.push` decisions inline in a screen.
-- D6: a file in `app/` that defines the screen's components, holds helpers, exports anything besides the default, or runs to 80+ lines (`repo.mjs layout` lists them under route files).
+- D6: a file in `app/` that does more than render a screen: its own components, helpers, other exports, state (`useState`), app hooks (`useRouter`, `useOnboarding`), several JSX elements, or 80+ lines. Short does not mean thin (`repo.mjs layout` lists them under route files). Two route styles side by side (thin routes next to routes holding their screen) is a repo pattern for the keep / gradual / now decision.
 - D11: `.filter`, `.find`, `.split(...)[0]`, date comparisons or copy chosen from domain fields in a component body; a `detailFor(kind, entity)` helper below the components.
 - D8: entity rules (price, status transitions) in `utils/` or `lib/`.
 - Not a finding: a screen component (not a route file) that renders and wires named hooks and calls named view functions; formatting a single value inline; inline styles when the repo uses them.

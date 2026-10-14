@@ -63,7 +63,7 @@ test("a route file that holds the whole screen is flagged, thin routes and layou
   const out = layout(makeRepo(files));
   assert.match(out, /^\d+\t5\tapp\/fit\.tsx\tflag · 5 components, \d+ lines$/m);
   assert.doesNotMatch(out, /app\/plan\.tsx\tflag|_layout\.tsx\tflag ·|not-found\.tsx\tflag ·/);
-  assert.match(out, /^fat route files: 1 of 2 route files$/m);
+  assert.match(out, /^screens in route files \(2\+\): 1 of 2 route files, 1 thin$/m);
 });
 
 test("a route file exporting helpers is flagged; framework exports are allowed", () => {
@@ -77,10 +77,49 @@ test("a route file exporting helpers is flagged; framework exports are allowed",
   assert.doesNotMatch(out, /app\/b\.tsx\tflag/);
 });
 
-test("fat route files across the repo are flagged as a pattern", () => {
-  const files = { ...expo, "app/index.tsx": thinRoute("TodayScreen") };
-  for (const name of ["fit", "closet", "plan"]) files[`app/${name}.tsx`] = fatScreen;
-  assert.match(layout(makeRepo(files)), /^fat route files: 3 of 4 route files\tflag$/m);
+test("two routes holding their screen next to thin ones are flagged as a pattern", () => {
+  const files = { ...expo, "app/index.tsx": thinRoute("TodayScreen"), "app/plan.tsx": thinRoute("PlanScreen") };
+  for (const name of ["fit", "closet"]) files[`app/${name}.tsx`] = fatScreen;
+  assert.match(layout(makeRepo(files)), /^screens in route files \(2\+\): 2 of 4 route files, 2 thin\tflag$/m);
+});
+
+const smallScreen = `import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Button, Page, Title } from "../shared/ui";
+
+export default function Onboarding() {
+  const router = useRouter();
+  const [step, setStep] = useState(0);
+  return (
+    <Page>
+      <Title>Step {step + 1}</Title>
+      <Button label="Next" onPress={() => (step ? router.replace("/") : setStep(1))} />
+    </Page>
+  );
+}
+`;
+
+test("a short route that builds its own screen is flagged; params and Stack.Screen options are thin", () => {
+  const files = {
+    ...expo,
+    "app/onboarding.tsx": smallScreen,
+    "app/item.tsx": `import { Stack, useLocalSearchParams } from "expo-router";
+import { ItemScreen } from "../features/closet/ItemScreen";
+
+export default function Item() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return (
+    <>
+      <Stack.Screen options={{ title: "Item" }} />
+      <ItemScreen id={id} />
+    </>
+  );
+}
+`,
+  };
+  const out = layout(makeRepo(files));
+  assert.match(out, /app\/onboarding\.tsx\tflag · calls useRouter, useState$/m);
+  assert.doesNotMatch(out, /app\/item\.tsx\tflag/);
 });
 
 test("route files only count when the app uses a file router", () => {
@@ -89,7 +128,7 @@ test("route files only count when the app uses a file router", () => {
 
 test("signals checks the changed files and names each reason", () => {
   const repo = makeRepo({ ...expo, "app/plan.tsx": thinRoute("PlanScreen"), "app/fit.tsx": fatScreen });
-  assert.match(signals(repo), /^app\/fit\.tsx\tflag · many components: 5 in \d+ lines · fat route file: 5 components, \d+ lines$/m);
+  assert.match(signals(repo), /^app\/fit\.tsx\tflag · many components: 5 in \d+ lines · screen in route file: 5 components, \d+ lines$/m);
   assert.doesNotMatch(signals(repo), /plan\.tsx/);
   assert.match(signals(repo, "app/plan.tsx"), /^no flags in 1 file\(s\)$/m);
 });

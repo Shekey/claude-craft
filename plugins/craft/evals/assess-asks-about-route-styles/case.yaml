@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: assess-asks-about-route-styles
+description: "Expo app where four routes only render a feature screen and two (onboarding, welcome) build their screen inline, one of them only 16 lines; assess must report the two route styles as one repo pattern and leave keep / gradual / now open instead of excusing the short route."
+tags: [architect, calibration, layout]
+context:
+  scaffold_script: fixture.sh
