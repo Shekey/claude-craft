@@ -27,7 +27,7 @@ Read before writing code in a React web app (Vite, CRA, Remix/React Router frame
 - D3: `loading`/`error`/`data` booleans instead of one status union; `isOpen` plus `selectedId` that can disagree.
 - D4: `useEffect(() => setX(f(props)), [props])`; effects chained to update each other.
 - D5: `fetch`, `localStorage`, analytics or navigation decisions inline in components.
-- D6: a route file defining the page's components or exporting helpers.
+- D6: a route file defining the page's components, exporting helpers, holding state or calling app hooks, however short. Thin routes next to routes holding their page is a repo pattern for the keep / gradual / now decision.
 - D9: the same error toast mapping in many components.
 - D11: three or more values derived from a domain object inside one component body; a helper below the components that takes the entity and returns display text.
 - Not a finding: a large component with one responsibility; prop drilling two levels deep.

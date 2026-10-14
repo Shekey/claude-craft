@@ -1,6 +1,7 @@
 import type { Recommendation } from "@sww/engine";
-import { createContext, type ReactNode, useContext } from "react";
+import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
 import type { Odds } from "../features/comfort/insight";
+import { saveKept } from "../shared/storage";
 import type { Units } from "../shared/units";
 
 export type Place = { query: string; label: string };
@@ -16,8 +17,21 @@ export type AppState = {
 
 const AppContext = createContext<AppState | null>(null);
 
-export function AppProvider({ children, value }: { children: ReactNode; value?: AppState }) {
-  return <AppContext.Provider value={value ?? null}>{children}</AppContext.Provider>;
+export function AppProvider({ children, initial }: { children: ReactNode; initial?: Partial<AppState> }) {
+  const [rec] = useState<AppState["rec"]>(initial?.rec ?? null);
+  const [place] = useState<Place | null>(initial?.place ?? null);
+  const value = useMemo<AppState>(
+    () => ({
+      rec,
+      place,
+      units: initial?.units ?? "metric",
+      plan: initial?.plan ?? { home: new Date() },
+      insight: initial?.insight ?? null,
+      keepOutfit: (recId, home, via) => saveKept({ recId, home: home.toISOString(), via }),
+    }),
+    [rec, place, initial],
+  );
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useApp(): AppState {
