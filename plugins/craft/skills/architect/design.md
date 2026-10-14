@@ -11,6 +11,7 @@ Kinds:
 Severity (design, structure, bug):
 - **high**: causes bugs or makes them likely (impossible states, drifting duplicates, state kept in sync by hand), or a bug that loses or corrupts data.
 - **medium**: slows every change to the unit (mixed responsibilities, fat entry points, misplaced domain logic), or a bug with a visible but recoverable effect.
+- **low**: worth changing but contained and harmless to leave for now (a repo pattern such as several components per file), or a cosmetic bug.
 
 ## D1 · One responsibility per unit
 List the concerns the unit handles: rendering, form state, server I/O, device APIs or permissions, file or image processing, mapping, validation, duplicate or business rules, analytics, navigation decisions, error-to-action policy. More than about three, or two that change for unrelated reasons, is a finding.

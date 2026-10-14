@@ -4,7 +4,7 @@ A Claude Code plugin that keeps engineering discipline the same in any language:
 
 ## Install
 
-Push this folder to GitHub (e.g. `shekey/claude-craft`), then in Claude Code:
+In Claude Code:
 
 ```
 /plugin marketplace add shekey/claude-craft
@@ -13,7 +13,7 @@ Push this folder to GitHub (e.g. `shekey/claude-craft`), then in Claude Code:
 
 That one install also installs Anthropic's `code-simplifier` agent as a dependency. You'll be asked for your default lean level (default `full`); change it later in `/config`.
 
-Local testing without GitHub: `/plugin marketplace add /path/to/craft`.
+Local testing from a clone: `/plugin marketplace add /path/to/claude-craft`.
 
 Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mjs` with no dependencies).
 
@@ -23,8 +23,8 @@ Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mj
 |---|---|
 | Principles | Injected at every session start: repo conventions first, the lean ladder, interface and comment rules, definition of done |
 | `/craft:task` | The entry point for every task: picks the path (question, bug, tests, cleanup, feature), loads the stack pack and runs the shared tail |
-| `craft:bug` | Bug path: reproduce, failing test, root cause, fix, then the same bug elsewhere |
-| `craft:tests` | Tests path: say what blocks testing, pin current behavior, then edge cases, in the repo's own runner |
+| `/craft:bug` | Bug path: reproduce, failing test, root cause, fix, then the same bug elsewhere |
+| `/craft:tests` | Tests path: say what blocks testing, pin current behavior, then edge cases, in the repo's own runner |
 | `/craft:plan` | A plan for every change, with a `While here` line; waits for approval unless trivial |
 | `/craft:adapt` | Existing repo: maps the architecture and verify commands into craft's per-repo cache (see below) |
 | `/craft:architect` | Assess structure and code design, keep a findings backlog you pick from, migrate in steps, enforce boundaries with a baseline |
@@ -95,6 +95,7 @@ If a repo contains `.claude/conventions.md` or `.claude/craft.json` (because a t
 | Java | ArchUnit (`freeze` for existing violations) | yes, inside `./gradlew check` |
 | Python | import-linter | yes, when configured |
 | Go | `internal/` + depguard | yes, when `.golangci.*` exists |
+| Rust | crate boundaries in a workspace, `pub(crate)` by default | yes, through `cargo clippy` and `cargo test` |
 
 ### Findings backlog
 
@@ -138,7 +139,8 @@ Rule order: correctness and guardrails, then design, then lean. Lean decides sco
 - `gradual-pattern-new-file`: with `several components per file · gradual` decided, a new component gets its own file;
 - router cases, one per task type (`route-*`): a question makes no edits, a bug gets a failing test before the fix and the same bug found elsewhere, tests name the clock as the blocker, cleanup pins behavior first, a feature is planned and mirrors the CLI;
 - `adapt-keeps-repo-tooling`: a repo with ESLint, Jest and a layered layout keeps them, with no Biome, Vitest or FSD brought in;
-- `improve-separate-commit`: touched-file fixes land in their own commit and a far-away problem goes to the backlog untouched.
+- `improve-separate-commit`: touched-file fixes land in their own commit and a far-away problem goes to the backlog untouched;
+- `assess-monorepo-slash-command`: assessing one package of a monorepo through the slash-command argument stays inside that path, follows the report contract and finds the seeded bug.
 
 Run them with:
 
@@ -179,7 +181,7 @@ Each changed file is assigned to its nearest project (`package.json`, Gradle set
 | Go | gofmt on changed files | `go vet` and `go test` on changed packages |
 | Rust | `cargo fmt` | clippy `-D warnings`, `cargo test` |
 
-The package manager comes from the lockfile (pnpm by default).
+The package manager comes from the lockfile (pnpm by default). Feature-Sliced Design's `steiger` runs through a `lint:fsd` script when it is installed, next to the boundary check (see Architecture).
 
 See exactly what it would run in a repo:
 
@@ -209,7 +211,7 @@ All keys are optional. `improve` is `fix` (default), `record` or `off`. `verify`
 node --test plugins/craft/tests/*.test.mjs
 ```
 
-The tests build small throwaway repos for each stack (pnpm, yarn, npm, Gradle, Python, monorepo), check stack detection (Expo, Gradle Kotlin and Java, Maven, Next, React, NestJS, plain Node, an Expo app with `android/`, a monorepo), and cover the commit guard and the backlog parser. CI runs them on every push. Evals live in `plugins/craft/evals` (see Evals above).
+The tests build small throwaway repos for each stack (pnpm, yarn, npm, Gradle, Python, monorepo), check stack detection (Expo, Gradle Kotlin and Java, Maven, Next, React, NestJS, plain Node, an Expo app with `android/`, a monorepo), the verify commands per package manager and stack, the layout thresholds, route-file checks and `signals`, the commit guard and the backlog parser. CI runs them on every push. Evals live in `plugins/craft/evals` (see Evals above).
 
 ## Turn off Claude Code's own commit attribution
 
