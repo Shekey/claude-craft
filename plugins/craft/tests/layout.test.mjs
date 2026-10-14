@@ -232,3 +232,42 @@ const best = computed(() => data.value?.items.filter((i) => i.done).length ?? 0)
   assert.match(out, /pages\/stats\.vue\tflag · calls useFetch$/m);
   assert.doesNotMatch(out, /habits\/\[id\]\.vue\tflag/);
 });
+
+test("nest controllers with direct ORM access are flagged, controllers calling services are not", () => {
+  const repo = makeRepo({
+    "package.json": { dependencies: { "@nestjs/core": "11", "@nestjs/typeorm": "11" } },
+    "src/orders/orders.controller.ts": `import { Controller, Get } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Order } from "./order.entity";
+
+@Controller("orders")
+export class OrdersController {
+  constructor(@InjectRepository(Order) private readonly orders: Repository<Order>) {}
+
+  @Get()
+  list() {
+    return this.orders.find();
+  }
+}
+`,
+    "src/users/users.controller.ts": `import { Controller, Get } from "@nestjs/common";
+import { UsersService } from "./users.service";
+
+@Controller("users")
+export class UsersController {
+  constructor(private readonly users: UsersService) {}
+
+  @Get()
+  list() {
+    return this.users.list();
+  }
+}
+`,
+  });
+  const out = layout(repo);
+  assert.match(out, /^controllers and resolvers \(2; flag on direct ORM or database access\)$/m);
+  assert.match(out, /src\/orders\/orders\.controller\.ts\tflag · data access in controller: TypeORM$/m);
+  assert.doesNotMatch(out, /users\.controller\.ts\tflag/);
+  assert.match(signals(repo, "src/orders/orders.controller.ts"), /flag · data access in controller: TypeORM/);
+});

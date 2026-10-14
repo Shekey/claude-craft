@@ -11,7 +11,7 @@ Read before writing code in a NestJS service. The repo's conventions, config and
 
 ## Rules
 - One module per feature. A module exports only the providers other modules need; everything else stays internal.
-- Controllers and resolvers stay thin: DTO in, call one service method, map the result out (D6). No ORM calls, no business rules.
+- Controllers and resolvers stay thin: DTO in, call one service method, map the result out (D6). No ORM calls, no business rules. `repo.mjs layout` and `signals` flag a controller or resolver that injects a repository, ORM client or model.
 - Services hold use cases. Persistence sits behind a repository or the ORM client inside the module; don't spread raw queries across services.
 - Every input is validated at the boundary: DTO classes with validation decorators and `whitelist: true, forbidNonWhitelisted: true`, or a schema pipe. Params are parsed (`ParseIntPipe`, `ParseUUIDPipe`).
 - Auth and authorization in guards; cross-cutting concerns in interceptors, pipes and exception filters, configured once (D9).
@@ -29,7 +29,7 @@ Read before writing code in a NestJS service. The repo's conventions, config and
 - Not a finding: a module with a single provider; a thin controller with many endpoints.
 
 ## Boundaries
-- Feature modules under `src/modules/<name>` with a public `index.ts`; `shared` never imports modules (see `craft:architect` reference, backend modules).
+- Feature modules where the repo keeps them (`src/<name>` as the Nest CLI generates, or `src/modules/<name>`), each with a public `index.ts`; `shared` never imports modules (see `craft:architect` reference, backend modules).
 - Enforce with dependency-cruiser (`templates/dependency-cruiser.modules.cjs`) as a `lint:arch` script; verify runs it. Nest's DI already blocks unexported providers at runtime; the import rule catches direct file imports.
 
 ## Tests
