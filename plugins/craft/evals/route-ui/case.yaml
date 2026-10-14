@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: route-ui
+description: "A screen request takes the ui path: it reads the UI setup, builds with the repo's shadcn components and tokens, and covers loading, empty and error states."
+tags: [router, ui]
+context:
+  scaffold_script: fixture.sh

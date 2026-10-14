@@ -73,6 +73,8 @@ function stackSection() {
     if (pack) return `- ${stack} (${where}): read ${packPath(pack)}${also} before writing code there`;
     return extras.length ? `- ${stack} (${where}): read ${extras.map(packPath).join(" and ")} for the libraries it uses` : `- ${stack} (${where}): no stack pack, follow the conventions`;
   });
+  const shadcn = [...new Set(stacks.flatMap(({ dirs }) => dirs))].filter((d) => existsSync(join(context.root, d, "components.json")));
+  if (shadcn.length) lines.push(`- UI: shadcn/ui (components.json in ${shadcn.map((d) => d || ".").join(", ")}); screen and UX tasks take the craft:ui path`);
   return `# Stacks in this repo\n${lines.join("\n")}\nThe repo's conventions and config win over a stack pack wherever they differ.`;
 }
 

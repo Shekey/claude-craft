@@ -15,7 +15,7 @@ Never "improve" a repo's established pattern unless the task is a refactor that 
 Lean decides what gets built and how much. It never decides how responsibilities are split. A focused hook, mapper, use case or component with a clear name is not a speculative abstraction, even when it adds a file. What lean forbids is structure without a present need: an interface with one implementation, options nobody asked for, empty layers.
 
 ## Every task
-- Start with craft:task. It picks the path (question, bug, tests, cleanup, feature), loads the stack pack and applies the shared tail: while here, verify, review, commit.
+- Start with craft:task. It picks the path (question, bug, tests, cleanup, feature, ui), loads the stack pack and applies the shared tail: while here, verify, review, commit.
 - Changes start with a plan (craft:plan). Wait for approval unless the change is trivial (one obvious edit).
 - Identify the mode: existing architecture (craft:adapt), new project (craft:greenfield), refactor (craft:refactor) or structural change and assessment (craft:architect).
 - Before writing code, find 2–3 existing files that do something similar and mirror them.

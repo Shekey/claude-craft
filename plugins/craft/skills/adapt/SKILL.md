@@ -18,6 +18,7 @@ Otherwise discover, then write the conventions file (max ~50 lines, facts only):
 - **Tests**: location, naming, fixtures and mocks style, what is usually tested.
 - **Commits**: the style of the last ~20 commits (`git log --oneline -20`).
 - **Verify**: the exact commands that prove a change is correct.
+- **UI** (apps with a UI): the `## UI` section from `craft:ui` step 1: component library (`components.json` means shadcn/ui), where tokens live, the Figma file URL (ask once; `none` is an answer), and how to preview.
 
 Then check what the craft verify hook would run, from the repo root with any uncommitted change present:
 

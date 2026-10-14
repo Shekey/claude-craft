@@ -119,6 +119,12 @@ test("session start names the extra packs after the main one", () => {
   assert.match(context, /next \(\.\): read .*stacks\/nextjs\.md, then .*stacks\/react\.md before writing code there/);
 });
 
+test("session start names shadcn/ui when components.json exists", () => {
+  const repo = makeRepo({ "package.json": { dependencies: { react: "19" } }, "components.json": "{}" });
+  const context = JSON.parse(run("session-start.mjs", { cwd: repo, env: { CLAUDE_PROJECT_DIR: repo } }).out).hookSpecificOutput.additionalContext;
+  assert.match(context, /- UI: shadcn\/ui \(components\.json in \.\); screen and UX tasks take the craft:ui path/);
+});
+
 test("improve mode defaults to fix", () => {
   const repo = makeRepo({ "package.json": {} });
   const context = JSON.parse(run("session-start.mjs", { cwd: repo, env: { CLAUDE_PROJECT_DIR: repo } }).out).hookSpecificOutput.additionalContext;

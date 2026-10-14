@@ -12,7 +12,7 @@ The task: `$ARGUMENTS` (or the user's last message).
 
 Say the path in one line before anything else, e.g. `Path: bug`. If the user names a path, use it.
 
-Then load that path's skill with the Skill tool before reading further or editing anything (`craft:bug`, `craft:tests`, `craft:refactor`, `craft:plan`). The table only chooses the path; the steps that make the path work are in its skill and none of them is optional, however small the change looks.
+Then load that path's skill with the Skill tool before reading further or editing anything (`craft:bug`, `craft:tests`, `craft:refactor`, `craft:plan`, `craft:ui`). The table only chooses the path; the steps that make the path work are in its skill and none of them is optional, however small the change looks.
 
 | Type | Signals | Path |
 |---|---|---|
@@ -21,12 +21,13 @@ Then load that path's skill with the Skill tool before reading further or editin
 | tests | add or improve tests, coverage, "make this testable" | `craft:tests` |
 | cleanup | refactor, simplify, rename, restructure, no behavior change | `craft:refactor`; `craft:architect` when modules or folders move |
 | feature | new or changed behavior | `craft:plan`, then implement following `craft:adapt`, with a test for the new behavior |
+| ui | build or change a screen, component, layout, styling or UX flow; a Figma link | `craft:plan`, then `craft:ui` |
 
 A feature needs a test for the new behavior even when it sits in an entry point that is awkward to test (a CLI, a route, a screen): test it at that boundary (spawn the CLI, call the handler, render the screen) or take the seam from `craft:tests`. "The helper it calls is already tested" is not a test of the feature.
 
 When the user says not to wait for approval, still write the plan; just don't stop for an answer.
 
-When a request mixes types, do them in this order, each with its own commits: bug, tests, cleanup, feature. A question that ends in "so change it" becomes the matching path once the answer is given.
+A feature with a screen is the ui path; a feature without one stays on the feature path. When a request mixes types, do them in this order, each with its own commits: bug, tests, cleanup, feature or ui. A question that ends in "so change it" becomes the matching path once the answer is given.
 
 ## 2. Load context (every path)
 

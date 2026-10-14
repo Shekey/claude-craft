@@ -16,6 +16,8 @@ Pick the language's standard, boring toolchain. Confirm the choice in the plan.
 | Rust | cargo | rustfmt + clippy | compiler | `cargo test` |
 | Other | the community default | the community default | | |
 
+UI for a new web app (React, Next.js, TanStack Start, Vue or Nuxt): suggest Tailwind with shadcn/ui (shadcn-vue for Vue) and its MCP server (`pnpm dlx shadcn@latest mcp init --client claude`), and ask for the Figma file URL if there is one; record the answers in the `## UI` section (`craft:ui`). Suggest, don't install, until the plan is approved.
+
 Structure (details in `craft:architect` and its reference):
 - Small project: plain feature folders.
 - Frontend web or React Native that will grow: Feature-Sliced Design, starting with only `app`, `pages` and `shared`.
