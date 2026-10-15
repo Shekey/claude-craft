@@ -111,6 +111,7 @@ export const PACKS = {
   react: "react.md",
   nuxt: "vue-nuxt.md",
   vue: "vue-nuxt.md",
+  angular: "angular.md",
   nestjs: "nestjs.md",
   kotlin: "kotlin-java.md",
   java: "kotlin-java.md",
@@ -128,6 +129,7 @@ function nodeStack(pkg) {
   if ("next" in deps) return "next";
   if ("@tanstack/react-start" in deps) return "tanstack-start";
   if ("@nestjs/core" in deps) return "nestjs";
+  if ("@angular/core" in deps) return "angular";
   if ("react" in deps) return "react";
   if ("vue" in deps) return "vue";
   return "node";

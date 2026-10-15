@@ -71,6 +71,12 @@ test("nuxt and vue apps pick the vue-nuxt pack", () => {
   assert.deepEqual(stacksOf({ "package.json": { dependencies: { vue: "3" }, devDependencies: { vite: "7" } } }), [{ stack: "vue", dirs: [""], pack: "vue-nuxt.md" }]);
 });
 
+test("angular app picks the angular pack", () => {
+  assert.deepEqual(stacksOf({ "package.json": { dependencies: { "@angular/core": "20", "@angular/router": "20" } } }), [
+    { stack: "angular", dirs: [""], pack: "angular.md" },
+  ]);
+});
+
 test("plain node has no pack", () => {
   assert.deepEqual(stacksOf({ "package.json": { dependencies: { zod: "4" } } }), [{ stack: "node", dirs: [""], pack: null }]);
 });

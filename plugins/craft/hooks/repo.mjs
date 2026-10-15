@@ -157,10 +157,12 @@ const PATTERN_SHARE = 0.25;
 const COMPONENT = /^(?:export\s+)?(?:default\s+)?(?:function\s+[A-Z][a-z]\w*|const\s+[A-Z][a-z]\w*\s*[=:]|class\s+[A-Z][a-z]\w*\s+extends\b)/gm;
 const UI_KIT = /(^|\/)(shared|common|components|design-system)\/ui(\/|\.[jt]sx$)|(^|\/)(ui-kit|design-system)\//i;
 const COMPOSABLE = /@Composable\s+(?:\w+\s+)*fun\s+[A-Z]/g;
+const NG_COMPONENT = /@Component\s*\(/g;
 
 function components(file, text) {
   if (/\.[jt]sx$/i.test(file)) return (text.match(COMPONENT) ?? []).filter((m) => !/\bconst\s+Route\b/.test(m)).length;
   if (/\.kt$/i.test(file)) return (text.match(COMPOSABLE) ?? []).length;
+  if (/\.ts$/i.test(file)) return (text.match(NG_COMPONENT) ?? []).length;
   return 0;
 }
 

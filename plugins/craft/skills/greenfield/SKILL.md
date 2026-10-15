@@ -10,13 +10,14 @@ Pick the language's standard, boring toolchain. Confirm the choice in the plan.
 | Ecosystem | Package manager | Format + lint | Types | Tests |
 |---|---|---|---|---|
 | TypeScript / JS / React / React Native | pnpm | Biome | `tsc --noEmit`, `strict: true` | Vitest (Jest only where the platform requires it, e.g. React Native preset) |
+| Angular | the CLI's package manager (pnpm if unset) | angular-eslint + Prettier, or Biome | `strict` and `strictTemplates` | Vitest |
 | Kotlin / Android | Gradle (Kotlin DSL, version catalog) | ktlint or Spotless + detekt | compiler | JUnit 5 + kotlinx-coroutines-test |
 | Python | uv | Ruff | mypy or pyright strict | pytest |
 | Go | go modules | gofmt + golangci-lint | compiler | `go test` |
 | Rust | cargo | rustfmt + clippy | compiler | `cargo test` |
 | Other | the community default | the community default | | |
 
-UI for a new web app (React, Next.js, TanStack Start, Vue or Nuxt): suggest Tailwind with shadcn/ui (shadcn-vue for Vue) and its MCP server (`pnpm dlx shadcn@latest mcp init --client claude`), and ask for the Figma file URL if there is one; record the answers in the `## UI` section (`craft:ui`). Suggest, don't install, until the plan is approved.
+UI for a new web app (React, Next.js, TanStack Start, Vue, Nuxt or Angular): suggest Tailwind with shadcn/ui (shadcn-vue for Vue, spartan/ui for Angular) and its MCP server (`pnpm dlx shadcn@latest mcp init --client claude`), and ask for the Figma file URL if there is one; record the answers in the `## UI` section (`craft:ui`). Suggest, don't install, until the plan is approved.
 
 Structure (details in `craft:architect` and its reference):
 - Small project: plain feature folders.

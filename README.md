@@ -35,7 +35,7 @@ Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mj
 | `/craft:lean` | Switch level (`lite`, `full`, `ultra`, `off`), or `debt` to list every `shortcut:` marker |
 | `craft:reviewer` agent | Fresh-context review of the diff; reports only |
 | `code-simplifier` agent | Installed with craft; cleanup pass told to follow the repo's conventions over its own defaults |
-| Stack packs | Rules, design signals and the boundary tool for React Native/Expo, Kotlin/Java, Next.js, React, TanStack (Start, Router, Query, Form, Table), Vue/Nuxt and NestJS (`plugins/craft/stacks/`) |
+| Stack packs | Rules, design signals and the boundary tool for React Native/Expo, Kotlin/Java, Next.js, React, TanStack (Start, Router, Query, Form, Table), Vue/Nuxt, Angular and NestJS (`plugins/craft/stacks/`) |
 | SessionStart hook | Loads principles, the repo's conventions, the detected stacks with the pack to read for each, the improve mode and the active lean level |
 | PreToolUse hook | Blocks commits and pushes with AI trailers or mentions, and staged narration comments (`// Updated…`, `// Added…`, TODO, FIXME). `shortcut:` markers are allowed |
 | Stop hook | When Claude finishes with uncommitted changes: auto-fix, then lint, types and related tests. Failures go back to Claude, up to 3 rounds |
@@ -66,7 +66,7 @@ claude plugin install figma@claude-plugins-official      # Figma MCP and its ski
 pnpm dlx shadcn@latest mcp init --client claude           # shadcn MCP, in a project with components.json
 ```
 
-`/craft:greenfield` suggests Tailwind with shadcn/ui (shadcn-vue for Vue) for new web apps and asks for the Figma file.
+`/craft:greenfield` suggests Tailwind with shadcn/ui (shadcn-vue for Vue, spartan/ui for Angular) for new web apps and asks for the Figma file.
 
 ## Improve each task
 
@@ -122,7 +122,7 @@ node <plugin>/hooks/repo.mjs backlog check    # validate the file: fields, unkno
 
 `assess` always ends with that roadmap, a `Structure` and a `Code design` verdict, and how many files were read out of how many. `hotspots` ranks by size, churn, state hooks and fan-in, and suggests a depth that grows with the package.
 
-Layout and repo patterns are measured too. `repo.mjs layout <dir>` lists the most crowded folders (flag at 20+ code files), oversized files (400+ lines), files with many components (5+ in 150+ lines), route files that do more than render a screen (expo-router, React Router, Next.js pages, TanStack Router and Nuxt pages: their own components, extra exports, hooks besides params, 4+ elements or 80+ lines; short is not thin), NestJS controllers and resolvers that inject an ORM handle, and whether several components per file or screens in route files (2+ routes, so two route styles side by side) are a repo-wide pattern, and suggests a size tier. `repo.mjs signals` applies the same thresholds to the files changed since the last commit; the task's While-here pass and the reviewer run it, so a flag shows up during normal work, not only in `assess`. `assess` states the tier. A rule break the repo repeats (the same D rule in 3+ units, several components per file, a layout that conflicts with the target for its tier) becomes one `Repo pattern:` finding, and craft asks once whether to keep it, change it gradually or change it now. The answer goes to a `## Decisions` section in the repo's conventions: `keep` makes it the convention, `gradual` makes new code follow the rule and moves files as tasks touch them, `now` puts it in the backlog as batches. When nobody can answer, the decision is reported as `open`, never silently kept.
+Layout and repo patterns are measured too. `repo.mjs layout <dir>` lists the most crowded folders (flag at 20+ code files), oversized files (400+ lines), files with many components (5+ in 150+ lines; Angular `@Component`s count too), route files that do more than render a screen (expo-router, React Router, Next.js pages, TanStack Router and Nuxt pages: their own components, extra exports, hooks besides params, 4+ elements or 80+ lines; short is not thin), NestJS controllers and resolvers that inject an ORM handle, and whether several components per file or screens in route files (2+ routes, so two route styles side by side) are a repo-wide pattern, and suggests a size tier. `repo.mjs signals` applies the same thresholds to the files changed since the last commit; the task's While-here pass and the reviewer run it, so a flag shows up during normal work, not only in `assess`. `assess` states the tier. A rule break the repo repeats (the same D rule in 3+ units, several components per file, a layout that conflicts with the target for its tier) becomes one `Repo pattern:` finding, and craft asks once whether to keep it, change it gradually or change it now. The answer goes to a `## Decisions` section in the repo's conventions: `keep` makes it the convention, `gradual` makes new code follow the rule and moves files as tasks touch them, `now` puts it in the backlog as batches. When nobody can answer, the decision is reported as `open`, never silently kept.
 
 dependency-cruiser needs a `typescript` package below version 7; on TypeScript 7 repos keep `typescript@^6` as a dev dependency for it. Verify fails if it analyses 0 modules, so a silently broken check can't pass.
 
@@ -225,7 +225,7 @@ All keys are optional. `improve` is `fix` (default), `record` or `off`. `verify`
 node --test plugins/craft/tests/*.test.mjs
 ```
 
-The tests build small throwaway repos for each stack (pnpm, yarn, npm, Gradle, Python, monorepo), check stack detection (Expo, Gradle Kotlin and Java, Maven, Next, React, TanStack, Nuxt and Vue, NestJS, plain Node, an Expo app with `android/`, a monorepo) and the add-on packs, the verify commands per package manager and stack, the layout thresholds, route-file and controller checks and `signals`, the commit guard and the backlog parser. CI runs them on every push. Evals live in `plugins/craft/evals` (see Evals above).
+The tests build small throwaway repos for each stack (pnpm, yarn, npm, Gradle, Python, monorepo), check stack detection (Expo, Gradle Kotlin and Java, Maven, Next, React, TanStack, Nuxt and Vue, Angular, NestJS, plain Node, an Expo app with `android/`, a monorepo) and the add-on packs, the verify commands per package manager and stack, the layout thresholds, route-file and controller checks and `signals`, the commit guard and the backlog parser. CI runs them on every push. Evals live in `plugins/craft/evals` (see Evals above).
 
 ## Turn off Claude Code's own commit attribution
 

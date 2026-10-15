@@ -271,3 +271,9 @@ export class UsersController {
   assert.doesNotMatch(out, /users\.controller\.ts\tflag/);
   assert.match(signals(repo, "src/orders/orders.controller.ts"), /flag · data access in controller: TypeORM/);
 });
+
+test("angular files with several components are counted", () => {
+  const cmp = (name) => `@Component({ selector: "app-${name}", template: "<p>${name}</p>" })\nexport class ${name}Component {}\n${"const x = 1;\n".repeat(30)}`;
+  const out = layout(makeRepo({ "package.json": { dependencies: { "@angular/core": "20" } }, "src/app/settings.ts": ["A", "B", "C", "D", "E"].map(cmp).join("\n") }));
+  assert.match(out, /^\d+\t5\tsrc\/app\/settings\.ts\tflag$/m);
+});

@@ -19,7 +19,7 @@ Figma: <file URL> · <what it covers>   (or: none)
 Preview: <storybook command, dev server URL, or none>
 ```
 
-- Components: `components.json` means shadcn/ui (its `aliases` say where components live); otherwise the UI library in package.json, or the folder the existing screens import their primitives from.
+- Components: `components.json` means shadcn/ui or shadcn-vue (its `aliases` say where components live); spartan/ui is its Angular counterpart; otherwise the UI library in package.json, or the folder the existing screens import their primitives from.
 - Figma: ask once with AskUserQuestion: "Is there a Figma file for this app? Paste its URL, or choose No design." Record the answer, `none` included, so later tasks don't ask again. A Figma URL in the task always wins over the recorded one.
 
 ## 2. Read the design
