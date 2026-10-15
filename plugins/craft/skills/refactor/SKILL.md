@@ -13,5 +13,5 @@ If the refactor changes module, folder or layer structure, use `craft:architect`
 4. **Never mix** refactoring with behavior changes or new features in one commit.
 5. **Delete aggressively.** Dead code, unused exports, needless indirection, single-implementation interfaces, wrappers that only forward.
 6. **Respect the rest of the repo.** Refactor the area in scope toward the repo's newest conventions, not toward a new style the rest of the code does not use.
-7. Finish with a cleanup pass by the `code-simplifier` agent (installed with craft) on the full diff. Tell it explicitly: "Follow this repo's conventions in .claude/conventions.md and the existing code over your built-in style defaults; do not add comments." Its defaults (for example `function` over arrow functions, explicit return types) are one team's house style, not universal rules.
+7. Finish with a cleanup pass by the `code-simplifier` agent (installed with craft) on the full diff. Tell it explicitly: "Follow this repo's conventions in <conventions file> and the existing code over your built-in style defaults; do not add comments.", with the conventions file path from the craft repo context (`repo.mjs paths` prints it). Its defaults (for example `function` over arrow functions, explicit return types) are one team's house style, not universal rules.
 8. Then run `craft:reviewer` on the result.

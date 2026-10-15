@@ -157,10 +157,12 @@ const PATTERN_SHARE = 0.25;
 const COMPONENT = /^(?:export\s+)?(?:default\s+)?(?:function\s+[A-Z][a-z]\w*|const\s+[A-Z][a-z]\w*\s*[=:]|class\s+[A-Z][a-z]\w*\s+extends\b)/gm;
 const UI_KIT = /(^|\/)(shared|common|components|design-system)\/ui(\/|\.[jt]sx$)|(^|\/)(ui-kit|design-system)\//i;
 const COMPOSABLE = /@Composable\s+(?:\w+\s+)*fun\s+[A-Z]/g;
+const NG_COMPONENT = /@Component\s*\(/g;
 
 function components(file, text) {
-  if (/\.[jt]sx$/i.test(file)) return (text.match(COMPONENT) ?? []).length;
+  if (/\.[jt]sx$/i.test(file)) return (text.match(COMPONENT) ?? []).filter((m) => !/\bconst\s+Route\b/.test(m)).length;
   if (/\.kt$/i.test(file)) return (text.match(COMPOSABLE) ?? []).length;
+  if (/\.ts$/i.test(file)) return (text.match(NG_COMPONENT) ?? []).length;
   return 0;
 }
 
@@ -168,12 +170,17 @@ const ROUTE_LINES_FLAG = 80;
 const ROUTE_COMPONENTS_FLAG = 2;
 const ROUTE_ELEMENTS_FLAG = 4;
 const ROUTE_PATTERN_MIN = 2;
-const PARAM_HOOKS = new Set(["useLocalSearchParams", "useGlobalSearchParams", "useSearchParams", "useParams", "useLoaderData", "useActionData"]);
+const PARAM_HOOKS = new Set([
+  "useLocalSearchParams", "useGlobalSearchParams", "useSearchParams", "useParams", "useLoaderData", "useActionData",
+  "useSearch", "useLoaderDeps", "useRouteContext", "useRoute", "definePageMeta", "useHead", "useSeoMeta",
+]);
 const HOOK_CALL = /\b(use[A-Z]\w*)\s*(?:<[^>()]*>)?\s*\(/g;
 const JSX_OPEN = /(?:^|[\s({>?:&|])<([A-Za-z][\w.]*)/g;
 const RESERVED_EXPORTS = new Set([
   "ErrorBoundary", "unstable_settings", "generateStaticParams",
   "loader", "action", "clientLoader", "clientAction", "meta", "links", "headers", "handle", "shouldRevalidate", "HydrateFallback", "Layout",
+  "Route", "metadata", "generateMetadata", "viewport", "generateViewport", "dynamic", "dynamicParams", "revalidate", "fetchCache", "runtime",
+  "preferredRegion", "maxDuration", "getServerSideProps", "getStaticProps", "getStaticPaths", "config",
 ]);
 const NAMED_EXPORT = /^export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+(\w+)/gm;
 const EXPORT_LIST = /^export\s*\{([^}]*)\}/gm;
@@ -183,20 +190,55 @@ function deps(dir) {
   return Object.assign({}, ...pkgs.flatMap((p) => [p?.dependencies, p?.devDependencies]));
 }
 
+const SCRIPT = /\.[jt]sx?$/;
+
 function routeMatcher(dir) {
   const all = deps(dir);
   const base = dir ? `${dir}/` : "";
-  const prefixes = [];
-  if ("expo-router" in all) prefixes.push(`${base}app/`, `${base}src/app/`);
-  if ("@react-router/dev" in all) prefixes.push(`${base}app/routes/`);
-  return (file) =>
-    /\.[jt]sx?$/.test(file) &&
-    prefixes.some((p) => file.startsWith(p)) &&
-    !/(^|\/)(_layout|\+[\w-]+)\.[jt]sx?$|\+api\.[jt]s$/.test(file) &&
-    !TEST.test(file);
+  const under = (file, ...folders) => folders.some((f) => file.startsWith(`${base}${f}`));
+  const rest = (file) => file.slice(base.length);
+  const rules = [];
+  if ("expo-router" in all) {
+    rules.push((f) => SCRIPT.test(f) && under(f, "app/", "src/app/") && !/(^|\/)(_layout|\+[\w-]+)\.[jt]sx?$|\+api\.[jt]s$/.test(f));
+  }
+  if ("@react-router/dev" in all) rules.push((f) => SCRIPT.test(f) && under(f, "app/routes/"));
+  if ("next" in all) {
+    rules.push((f) => SCRIPT.test(f) && under(f, "app/", "src/app/") && /(^|\/)page\.[jt]sx?$/.test(f));
+    rules.push((f) => SCRIPT.test(f) && /^(src\/)?pages\//.test(rest(f)) && !/^(src\/)?pages\/(api\/|_app\.|_document\.)/.test(rest(f)));
+  }
+  if ("@tanstack/react-router" in all || "@tanstack/react-start" in all) {
+    rules.push((f) => /\.[jt]sx$/.test(f) && under(f, "src/routes/", "app/routes/") && !/(^|\/)(__root\.[jt]sx|-[^/]*(\/|$))/.test(f));
+  }
+  if ("nuxt" in all) rules.push((f) => /\.vue$/.test(f) && under(f, "pages/", "app/pages/"));
+  return (file) => !TEST.test(file) && rules.some((rule) => rule(file));
 }
 
-function routeCheck(file, text, lines, count) {
+const DATA_ACCESS = [
+  [/@InjectRepository\b|\bRepository<|\bEntityManager\b|\bDataSource\b/, "TypeORM"],
+  [/\bPrismaService\b|\bPrismaClient\b|@prisma\/client/, "Prisma"],
+  [/@InjectModel\b|\bModel<|from ["']mongoose["']/, "Mongoose"],
+  [/from ["']drizzle-orm|\bdb\.(select|insert|update|delete)\(/, "Drizzle"],
+  [/@InjectEntityManager\b|\bEntityRepository<|@mikro-orm/, "MikroORM"],
+];
+
+function controllerMatcher(dir) {
+  return "@nestjs/core" in deps(dir) ? (file) => /\.(controller|resolver)\.ts$/.test(file) && !TEST.test(file) : () => false;
+}
+
+function controllerCheck(text) {
+  const found = DATA_ACCESS.filter(([pattern]) => pattern.test(text)).map(([, name]) => name);
+  return found.length ? `data access in controller: ${found.join(", ")}` : null;
+}
+
+function sfcParts(text) {
+  const script = [...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join("\n");
+  const template = text.match(/<template\b[^>]*>([\s\S]*)<\/template>/)?.[1] ?? "";
+  return { script, template };
+}
+
+function routeCheck(file, fullText, lines, count) {
+  const sfc = file.endsWith(".vue") ? sfcParts(fullText) : null;
+  const text = sfc ? `${sfc.script}\n${sfc.template}` : fullText;
   const names = [...text.matchAll(NAMED_EXPORT)].map((m) => m[1]);
   for (const m of text.matchAll(EXPORT_LIST)) {
     for (const part of m[1].split(",")) {
@@ -230,13 +272,17 @@ function layout(dir, limit) {
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
   const isRoute = routeMatcher(scope);
+  const isController = controllerMatcher(scope);
   const measured = files.slice(0, 4000).map((file) => {
     const text = readFileSync(at(file), "utf8");
     const lines = text.split("\n").length;
     const count = components(file, text);
     const flag = lines >= FILE_LINES_FLAG || (count >= COMPONENTS_FLAG && lines >= COMPONENT_FILE_LINES);
-    return { file, lines, components: count, flag, route: isRoute(file) ? routeCheck(file, text, lines, count) : null };
+    const controller = isController(file) ? { reason: controllerCheck(text) } : null;
+    return { file, lines, components: count, flag, route: isRoute(file) ? routeCheck(file, text, lines, count) : null, controller };
   });
+  const controllerFiles = measured.filter((f) => f.controller);
+  const controllers = { of: controllerFiles.length, files: controllerFiles.filter((f) => f.controller.reason).slice(0, limit) };
   const routeFiles = measured.filter((f) => f.route);
   const fat = routeFiles.filter((f) => f.route.flag);
   const routes = {
@@ -254,7 +300,7 @@ function layout(dir, limit) {
     examples: shared.sort((a, b) => b.components - a.components).slice(0, 5).map((f) => f.file),
   };
   const sizes = measured.sort((a, b) => Number(b.flag) - Number(a.flag) || b.lines - a.lines).slice(0, limit);
-  return { codeFiles: all.length, tier: all.length <= SMALL_TIER_MAX ? "small" : "medium+", folders, files: sizes, sharing, routes };
+  return { codeFiles: all.length, tier: all.length <= SMALL_TIER_MAX ? "small" : "medium+", folders, files: sizes, sharing, routes, controllers };
 }
 
 function changedFiles() {
@@ -279,6 +325,8 @@ function signals(files) {
     const reasons = [];
     if (lines >= FILE_LINES_FLAG) reasons.push(`oversized: ${lines} lines`);
     if (count >= COMPONENTS_FLAG && lines >= COMPONENT_FILE_LINES) reasons.push(`many components: ${count} in ${lines} lines`);
+    const controllerReason = controllerMatcher(packageOf(file))(file) && controllerCheck(text);
+    if (controllerReason) reasons.push(controllerReason);
     if (routeMatcher(packageOf(file))(file)) {
       const route = routeCheck(file, text, lines, count);
       if (route.flag) reasons.push(`screen in route file: ${route.reasons.join(", ")}`);
@@ -301,7 +349,7 @@ if (command === "paths") {
   );
 } else if (command === "stack") {
   const packs = join(dirname(fileURLToPath(import.meta.url)), "..", "stacks");
-  const stacks = detectStacks(root).map((s) => ({ ...s, pack: s.pack && join(packs, s.pack) }));
+  const stacks = detectStacks(root).map((s) => ({ ...s, pack: s.pack && join(packs, s.pack), extras: s.extras.map((e) => join(packs, e)) }));
   process.stdout.write(`${JSON.stringify(stacks, null, 2)}\n`);
 } else if (command === "mark") {
   const head = sh("git rev-parse HEAD", root);
@@ -316,7 +364,7 @@ if (command === "paths") {
   process.stdout.write(`${[`code files: ${codeFiles} · suggested depth: ${depth}`, "score\tlines\tcommits(6m)\tstate-hooks\tfan-in\tentry\tfile", ...lines].join("\n")}\n`);
 } else if (command === "layout") {
   const [dir = ".", limit = "8"] = args;
-  const { codeFiles, tier, folders, files, sharing, routes } = layout(dir, Number(limit) || 8);
+  const { codeFiles, tier, folders, files, sharing, routes, controllers } = layout(dir, Number(limit) || 8);
   const mark = (flag) => (flag ? "\tflag" : "");
   process.stdout.write(
     `${[
@@ -337,6 +385,13 @@ if (command === "paths") {
             "",
             `route files (thin: one default export rendering a screen, params read at most; flag at ${ROUTE_COMPONENTS_FLAG}+ components, other exports, hooks besides params, ${ROUTE_ELEMENTS_FLAG}+ JSX elements, or ${ROUTE_LINES_FLAG}+ lines)`,
             ...(routes.files.length ? routes.files.map((f) => `${f.lines}\t${f.components}\t${f.file}\tflag · ${f.route.reasons.join(", ")}`) : ["none flagged"]),
+          ]
+        : []),
+      ...(controllers.of
+        ? [
+            "",
+            `controllers and resolvers (${controllers.of}; flag on direct ORM or database access)`,
+            ...(controllers.files.length ? controllers.files.map((f) => `${f.lines}\t${f.file}\tflag · ${f.controller.reason}`) : ["none flagged"]),
           ]
         : []),
     ].join("\n")}\n`,

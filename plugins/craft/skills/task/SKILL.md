@@ -12,7 +12,7 @@ The task: `$ARGUMENTS` (or the user's last message).
 
 Say the path in one line before anything else, e.g. `Path: bug`. If the user names a path, use it.
 
-Then load that path's skill with the Skill tool before reading further or editing anything (`craft:bug`, `craft:tests`, `craft:refactor`, `craft:plan`). The table only chooses the path; the steps that make the path work are in its skill and none of them is optional, however small the change looks.
+Then load that path's skill with the Skill tool before reading further or editing anything (`craft:bug`, `craft:tests`, `craft:refactor`, `craft:plan`, `craft:ui`). The table only chooses the path; the steps that make the path work are in its skill and none of them is optional, however small the change looks.
 
 | Type | Signals | Path |
 |---|---|---|
@@ -21,12 +21,13 @@ Then load that path's skill with the Skill tool before reading further or editin
 | tests | add or improve tests, coverage, "make this testable" | `craft:tests` |
 | cleanup | refactor, simplify, rename, restructure, no behavior change | `craft:refactor`; `craft:architect` when modules or folders move |
 | feature | new or changed behavior | `craft:plan`, then implement following `craft:adapt`, with a test for the new behavior |
+| ui | build or change a screen, component, layout, styling or UX flow; a Figma link | `craft:plan`, then `craft:ui` |
 
 A feature needs a test for the new behavior even when it sits in an entry point that is awkward to test (a CLI, a route, a screen): test it at that boundary (spawn the CLI, call the handler, render the screen) or take the seam from `craft:tests`. "The helper it calls is already tested" is not a test of the feature.
 
 When the user says not to wait for approval, still write the plan; just don't stop for an answer.
 
-When a request mixes types, do them in this order, each with its own commits: bug, tests, cleanup, feature. A question that ends in "so change it" becomes the matching path once the answer is given.
+A feature with a screen is the ui path; a feature without one stays on the feature path. When a request mixes types, do them in this order, each with its own commits: bug, tests, cleanup, feature or ui. A question that ends in "so change it" becomes the matching path once the answer is given.
 
 ## 2. Load context (every path)
 
@@ -51,7 +52,7 @@ The mode comes from the repo's craft settings (`improve`), stated in the session
 
 Run this pass on every path that changes code, trivial changes included, once the task works and before the first commit:
 1. Re-read each file the task changed, whole. Then open every local module the changed code imports or calls (one level deep), even when you think you know what it does; problems there are backlog items.
-   Run `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" signals` (no arguments: the files changed since the last commit). It applies the layout thresholds to them: oversized files, many components in one file, screens in route files, crowded folders. Every flag goes on the list below; a flag is never ignored silently.
+   Run `node "${CLAUDE_PLUGIN_ROOT}/hooks/repo.mjs" signals` (no arguments: the files changed since the last commit). It applies the layout thresholds to them: oversized files, many components in one file, screens in route files, controllers with data access, crowded folders. Every flag goes on the list below; a flag is never ignored silently.
 2. List what you see. Use the design checklist and this short list: unused imports or variables, misleading names (`x`, `data`, `tmp`), needless branches (`else` after `return`, `if (cond) return true; else return false`), loose equality, the same steps repeated in several functions (the task adding another copy is the moment to extract it), swallowed errors, promises nobody awaits or catches.
 3. Sort each item:
    - **Fix now** (mode `fix` only): inside the files the task already changes, behavior-preserving, covered by tests or obviously safe, and small (about one function or 30 lines). Commit it on its own (`Remove unused import…`, `Extract save helper…`), never inside the bug fix or feature commit. Run the tests again after it.

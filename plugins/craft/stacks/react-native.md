@@ -10,7 +10,7 @@ Read before writing code in a React Native or Expo app. The repo's conventions, 
 - Tests: jest-expo or the `react-native` Jest preset with React Native Testing Library. Lint: ESLint (`eslint-config-expo`) or Biome.
 
 ## Rules
-- Route files stay thin: one default export that reads params and renders the screen from the feature or page folder (`app/fit.tsx` renders `features/fit/FitScreen`). No other components, helpers or constants in the route file, and no exports besides the default and expo-router's own (`ErrorBoundary`, `unstable_settings`, `generateStaticParams`); extra exports also make Fast Refresh reload the whole module. Nothing imports from `app/` (D6).
+- Route files stay thin (design.md D6): `app/fit.tsx` reads params and renders `features/fit/FitScreen`. Besides the default export only expo-router's own (`ErrorBoundary`, `unstable_settings`, `generateStaticParams`); extra exports also make Fast Refresh reload the whole module. Nothing imports from `app/`.
 - A screen folder holds the screen, one file per component that has its own props or reason to change, and the screen's logic: `features/fit/FitScreen.tsx`, `GoodFit.tsx`, `ItemCard.tsx`, `fit-view.ts` (+ `fit-view.test.ts`), `useFitScreen.ts`.
 - Components render a prepared view. Deriving what to show from domain data (filtering its lists, picking a case, parsing strings, date comparisons) goes in pure functions next to the screen; a view-model hook (`useFitScreen()`) composes the store, mutations and navigation and returns `{ view, actions }` (D11).
 - No DI container. Hooks, props and module imports are the seams; tests mock modules (`jest.mock`). Add a port only for something really swapped, such as a vendor SDK or a platform API.
@@ -28,7 +28,7 @@ Read before writing code in a React Native or Expo app. The repo's conventions, 
 - D3: `isLoading`, `error`, `data` and `isEmpty` as separate flags; photo `uri` plus `existing` plus `removed` booleans.
 - D4: `useEffect(() => setX(props.x), [props.x])`; a `useRef` "loaded once" guard around form initialisation.
 - D5: `fetch`, the API client, `AsyncStorage`, `track()` or `router.push` decisions inline in a screen.
-- D6: a file in `app/` that does more than render a screen: its own components, helpers, other exports, state (`useState`), app hooks (`useRouter`, `useOnboarding`), several JSX elements, or 80+ lines. Short does not mean thin (`repo.mjs layout` lists them under route files). Two route styles side by side (thin routes next to routes holding their screen) is a repo pattern for the keep / gradual / now decision.
+- D6: a file in `app/` that does more than render a screen, however short (`repo.mjs layout` lists them under route files). Two route styles side by side is a repo pattern for the keep / gradual / now decision.
 - D11: `.filter`, `.find`, `.split(...)[0]`, date comparisons or copy chosen from domain fields in a component body; a `detailFor(kind, entity)` helper below the components.
 - D8: entity rules (price, status transitions) in `utils/` or `lib/`.
 - Not a finding: a screen component (not a route file) that renders and wires named hooks and calls named view functions; formatting a single value inline; inline styles when the repo uses them.

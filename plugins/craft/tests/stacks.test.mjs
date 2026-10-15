@@ -51,6 +51,32 @@ test("nest api picks the nestjs pack", () => {
   ]);
 });
 
+test("tanstack start picks the tanstack pack with the react pack for components", () => {
+  const [found] = detectStacks(makeRepo({ "package.json": { dependencies: { "@tanstack/react-start": "1", "@tanstack/react-router": "1", react: "19" } } }));
+  assert.deepEqual(found, { stack: "tanstack-start", dirs: [""], pack: "tanstack.md", extras: ["react.md"] });
+});
+
+test("next app also reads the react pack, and the tanstack pack when it uses tanstack libraries", () => {
+  const [found] = detectStacks(makeRepo({ "package.json": { dependencies: { next: "16", react: "19", "@tanstack/react-query": "5" } } }));
+  assert.deepEqual(found.extras, ["react.md", "tanstack.md"]);
+});
+
+test("vite react app with tanstack router adds the tanstack pack", () => {
+  const [found] = detectStacks(makeRepo({ "package.json": { dependencies: { react: "19", "@tanstack/react-router": "1" } } }));
+  assert.deepEqual(found, { stack: "react", dirs: [""], pack: "react.md", extras: ["tanstack.md"] });
+});
+
+test("nuxt and vue apps pick the vue-nuxt pack", () => {
+  assert.deepEqual(stacksOf({ "package.json": { dependencies: { nuxt: "4", vue: "3" } } }), [{ stack: "nuxt", dirs: [""], pack: "vue-nuxt.md" }]);
+  assert.deepEqual(stacksOf({ "package.json": { dependencies: { vue: "3" }, devDependencies: { vite: "7" } } }), [{ stack: "vue", dirs: [""], pack: "vue-nuxt.md" }]);
+});
+
+test("angular app picks the angular pack", () => {
+  assert.deepEqual(stacksOf({ "package.json": { dependencies: { "@angular/core": "20", "@angular/router": "20" } } }), [
+    { stack: "angular", dirs: [""], pack: "angular.md" },
+  ]);
+});
+
 test("plain node has no pack", () => {
   assert.deepEqual(stacksOf({ "package.json": { dependencies: { zod: "4" } } }), [{ stack: "node", dirs: [""], pack: null }]);
 });
@@ -91,6 +117,18 @@ test("session start names the pack to read and the improve mode", () => {
   const context = JSON.parse(run("session-start.mjs", { cwd: repo, env: { CLAUDE_PROJECT_DIR: repo } }).out).hookSpecificOutput.additionalContext;
   assert.match(context, /react-native \(\.\): read .*stacks\/react-native\.md/);
   assert.match(context, /Improve mode: record/);
+});
+
+test("session start names the extra packs after the main one", () => {
+  const repo = makeRepo({ "package.json": { dependencies: { next: "16", react: "19" } } });
+  const context = JSON.parse(run("session-start.mjs", { cwd: repo, env: { CLAUDE_PROJECT_DIR: repo } }).out).hookSpecificOutput.additionalContext;
+  assert.match(context, /next \(\.\): read .*stacks\/nextjs\.md, then .*stacks\/react\.md before writing code there/);
+});
+
+test("session start names shadcn/ui when components.json exists", () => {
+  const repo = makeRepo({ "package.json": { dependencies: { react: "19" } }, "components.json": "{}" });
+  const context = JSON.parse(run("session-start.mjs", { cwd: repo, env: { CLAUDE_PROJECT_DIR: repo } }).out).hookSpecificOutput.additionalContext;
+  assert.match(context, /- UI: shadcn\/ui \(components\.json in \.\); screen and UX tasks take the craft:ui path/);
 });
 
 test("improve mode defaults to fix", () => {

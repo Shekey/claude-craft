@@ -4,7 +4,7 @@ A Claude Code plugin that keeps engineering discipline the same in any language:
 
 ## Install
 
-Push this folder to GitHub (e.g. `shekey/claude-craft`), then in Claude Code:
+In Claude Code:
 
 ```
 /plugin marketplace add shekey/claude-craft
@@ -13,7 +13,7 @@ Push this folder to GitHub (e.g. `shekey/claude-craft`), then in Claude Code:
 
 That one install also installs Anthropic's `code-simplifier` agent as a dependency. You'll be asked for your default lean level (default `full`); change it later in `/config`.
 
-Local testing without GitHub: `/plugin marketplace add /path/to/craft`.
+Local testing from a clone: `/plugin marketplace add /path/to/claude-craft`.
 
 Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mjs` with no dependencies).
 
@@ -22,9 +22,10 @@ Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mj
 | Piece | What it does |
 |---|---|
 | Principles | Injected at every session start: repo conventions first, the lean ladder, interface and comment rules, definition of done |
-| `/craft:task` | The entry point for every task: picks the path (question, bug, tests, cleanup, feature), loads the stack pack and runs the shared tail |
-| `craft:bug` | Bug path: reproduce, failing test, root cause, fix, then the same bug elsewhere |
-| `craft:tests` | Tests path: say what blocks testing, pin current behavior, then edge cases, in the repo's own runner |
+| `/craft:task` | The entry point for every task: picks the path (question, bug, tests, cleanup, feature, ui), loads the stack pack and runs the shared tail |
+| `/craft:bug` | Bug path: reproduce, failing test, root cause, fix, then the same bug elsewhere |
+| `/craft:tests` | Tests path: say what blocks testing, pin current behavior, then edge cases, in the repo's own runner |
+| `/craft:ui` | UI path: reads the Figma design through the Figma MCP when connected, builds with the repo's components and tokens (shadcn/ui when `components.json` exists), covers loading, empty and error states, checks the result against the design |
 | `/craft:plan` | A plan for every change, with a `While here` line; waits for approval unless trivial |
 | `/craft:adapt` | Existing repo: maps the architecture and verify commands into craft's per-repo cache (see below) |
 | `/craft:architect` | Assess structure and code design, keep a findings backlog you pick from, migrate in steps, enforce boundaries with a baseline |
@@ -34,7 +35,7 @@ Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mj
 | `/craft:lean` | Switch level (`lite`, `full`, `ultra`, `off`), or `debt` to list every `shortcut:` marker |
 | `craft:reviewer` agent | Fresh-context review of the diff; reports only |
 | `code-simplifier` agent | Installed with craft; cleanup pass told to follow the repo's conventions over its own defaults |
-| Stack packs | Rules, design signals and the boundary tool for React Native/Expo, Kotlin/Java, Next.js, React and NestJS (`plugins/craft/stacks/`) |
+| Stack packs | Rules, design signals and the boundary tool for React Native/Expo, Kotlin/Java, Next.js, React, TanStack (Start, Router, Query, Form, Table), Vue/Nuxt, Angular and NestJS (`plugins/craft/stacks/`) |
 | SessionStart hook | Loads principles, the repo's conventions, the detected stacks with the pack to read for each, the improve mode and the active lean level |
 | PreToolUse hook | Blocks commits and pushes with AI trailers or mentions, and staged narration comments (`// Updated…`, `// Added…`, TODO, FIXME). `shortcut:` markers are allowed |
 | Stop hook | When Claude finishes with uncommitted changes: auto-fix, then lint, types and related tests. Failures go back to Claude, up to 3 rounds |
@@ -43,9 +44,9 @@ Requires Node.js on the PATH of non-interactive shells (the hooks are plain `.mj
 
 One task goes through every step in this order, and each step knows about the next:
 
-1. **Session start** (`hooks/session-start.mjs`): detects the stacks (`detectStacks` in `hooks/lib.mjs`, the same project markers verify uses), writes them to the repo's `state.json`, and tells Claude which pack to read for which folder, the improve mode and the lean level.
+1. **Session start** (`hooks/session-start.mjs`): detects the stacks (`detectStacks` in `hooks/lib.mjs`, the same project markers verify uses), writes them to the repo's `state.json`, and tells Claude which pack to read for which folder (plus add-on packs: React for Next.js and TanStack Start components, TanStack for any app using `@tanstack/*`), whether the repo uses shadcn/ui, the improve mode and the lean level.
 2. **Router** (`/craft:task`): picks the path from the task type and loads the conventions, the stack pack for the area touched and the design checklist.
-3. **Path**: question (research rules, no edits), bug (`craft:bug`), tests (`craft:tests`), cleanup (`craft:refactor`, `craft:architect` when structure moves), feature (`craft:plan` + `craft:adapt`).
+3. **Path**: question (research rules, no edits), bug (`craft:bug`), tests (`craft:tests`), cleanup (`craft:refactor`, `craft:architect` when structure moves), feature (`craft:plan` + `craft:adapt`), ui (`craft:plan` + `craft:ui`).
 4. **Shared tail**, the same for every path that changes code:
    - **While here**: small fixes in files the task touches, in their own commit; anything wider goes to the findings backlog (`/craft:architect status` shows it).
    - **Verify**: the Stop hook runs the repo's own fix, lint, type and related-test commands per stack.
@@ -53,6 +54,19 @@ One task goes through every step in this order, and each step knows about the ne
    - **Commit**: `craft:commit`, then the end line `Improved: … · Backlog: …`.
 
 `node <plugin>/hooks/repo.mjs stack` prints the detected stacks and pack paths for the current repo. A monorepo gets one entry per app, and an Expo app with a committed `android/` folder gets both the React Native and the Kotlin pack. The repo's conventions always win over a pack.
+
+## UI work and Figma
+
+`/craft:adapt` (or the first UI task) records a `## UI` section in the repo's conventions: the component library (`components.json` means shadcn/ui), where the tokens live, the Figma file URL (asked once; `none` is a valid answer) and how to preview. Because the conventions load at every session start, the Figma URL is always in context. A Figma URL in the task wins over the recorded one.
+
+The ui path reads the frame with the Figma MCP when it is connected (and loads Figma's own design-to-code skill when installed), maps Figma variables to the repo's tokens, uses the repo's components first, then Code Connect, then the library, and adds missing shadcn components with its CLI or MCP. It never brings shadcn into a repo that uses another UI kit. To connect the tools:
+
+```
+claude plugin install figma@claude-plugins-official      # Figma MCP and its skills
+pnpm dlx shadcn@latest mcp init --client claude           # shadcn MCP, in a project with components.json
+```
+
+`/craft:greenfield` suggests Tailwind with shadcn/ui (shadcn-vue for Vue, spartan/ui for Angular) for new web apps and asks for the Figma file.
 
 ## Improve each task
 
@@ -95,6 +109,7 @@ If a repo contains `.claude/conventions.md` or `.claude/craft.json` (because a t
 | Java | ArchUnit (`freeze` for existing violations) | yes, inside `./gradlew check` |
 | Python | import-linter | yes, when configured |
 | Go | `internal/` + depguard | yes, when `.golangci.*` exists |
+| Rust | crate boundaries in a workspace, `pub(crate)` by default | yes, through `cargo clippy` and `cargo test` |
 
 ### Findings backlog
 
@@ -107,7 +122,7 @@ node <plugin>/hooks/repo.mjs backlog check    # validate the file: fields, unkno
 
 `assess` always ends with that roadmap, a `Structure` and a `Code design` verdict, and how many files were read out of how many. `hotspots` ranks by size, churn, state hooks and fan-in, and suggests a depth that grows with the package.
 
-Layout and repo patterns are measured too. `repo.mjs layout <dir>` lists the most crowded folders (flag at 20+ code files), oversized files (400+ lines), files with many components (5+ in 150+ lines), route files that do more than render a screen (expo-router and React Router: their own components, extra exports, hooks besides params, 4+ JSX elements or 80+ lines; short is not thin), and whether several components per file or screens in route files (2+ routes, so two route styles side by side) are a repo-wide pattern, and suggests a size tier. `repo.mjs signals` applies the same thresholds to the files changed since the last commit; the task's While-here pass and the reviewer run it, so a flag shows up during normal work, not only in `assess`. `assess` states the tier. A rule break the repo repeats (the same D rule in 3+ units, several components per file, a layout that conflicts with the target for its tier) becomes one `Repo pattern:` finding, and craft asks once whether to keep it, change it gradually or change it now. The answer goes to a `## Decisions` section in the repo's conventions: `keep` makes it the convention, `gradual` makes new code follow the rule and moves files as tasks touch them, `now` puts it in the backlog as batches. When nobody can answer, the decision is reported as `open`, never silently kept.
+Layout and repo patterns are measured too. `repo.mjs layout <dir>` lists the most crowded folders (flag at 20+ code files), oversized files (400+ lines), files with many components (5+ in 150+ lines; Angular `@Component`s count too), route files that do more than render a screen (expo-router, React Router, Next.js pages, TanStack Router and Nuxt pages: their own components, extra exports, hooks besides params, 4+ elements or 80+ lines; short is not thin), NestJS controllers and resolvers that inject an ORM handle, and whether several components per file or screens in route files (2+ routes, so two route styles side by side) are a repo-wide pattern, and suggests a size tier. `repo.mjs signals` applies the same thresholds to the files changed since the last commit; the task's While-here pass and the reviewer run it, so a flag shows up during normal work, not only in `assess`. `assess` states the tier. A rule break the repo repeats (the same D rule in 3+ units, several components per file, a layout that conflicts with the target for its tier) becomes one `Repo pattern:` finding, and craft asks once whether to keep it, change it gradually or change it now. The answer goes to a `## Decisions` section in the repo's conventions: `keep` makes it the convention, `gradual` makes new code follow the rule and moves files as tasks touch them, `now` puts it in the backlog as batches. When nobody can answer, the decision is reported as `open`, never silently kept.
 
 dependency-cruiser needs a `typescript` package below version 7; on TypeScript 7 repos keep `typescript@^6` as a dev dependency for it. Verify fails if it analyses 0 modules, so a silently broken check can't pass.
 
@@ -136,9 +151,10 @@ Rule order: correctness and guardrails, then design, then lean. Lean decides sco
 - `assess-flags-fat-route-screen`: a 370-line Expo route holding five components and its view logic must get a thin-route fix, a view-logic fix (pure functions or a view-model hook) and no DI container;
 - `assess-asks-about-route-styles`: thin routes next to two routes that build their screen inline (one only 16 lines) must get one repo-pattern finding and an open keep / gradual / now decision;
 - `gradual-pattern-new-file`: with `several components per file · gradual` decided, a new component gets its own file;
-- router cases, one per task type (`route-*`): a question makes no edits, a bug gets a failing test before the fix and the same bug found elsewhere, tests name the clock as the blocker, cleanup pins behavior first, a feature is planned and mirrors the CLI;
+- router cases, one per task type (`route-*`): a question makes no edits, a bug gets a failing test before the fix and the same bug found elsewhere, tests name the clock as the blocker, cleanup pins behavior first, a feature is planned and mirrors the CLI, a screen takes the ui path and uses the repo's shadcn components, tokens and every state;
 - `adapt-keeps-repo-tooling`: a repo with ESLint, Jest and a layered layout keeps them, with no Biome, Vitest or FSD brought in;
-- `improve-separate-commit`: touched-file fixes land in their own commit and a far-away problem goes to the backlog untouched.
+- `improve-separate-commit`: touched-file fixes land in their own commit and a far-away problem goes to the backlog untouched;
+- `assess-monorepo-slash-command`: assessing one package of a monorepo through the slash-command argument stays inside that path, follows the report contract and finds the seeded bug.
 
 Run them with:
 
@@ -172,14 +188,14 @@ Each changed file is assigned to its nearest project (`package.json`, Gradle set
 
 | Project | Auto-fix | Checks |
 |---|---|---|
-| Node | Biome if configured, otherwise ESLint `--fix` and Prettier if configured, otherwise a `format` script | `check`/`lint` script (or Biome/ESLint on changed files), `typecheck` script or `tsc --noEmit`, related tests: `vitest related` or `jest --findRelatedTests`, otherwise the `test` script |
+| Node | Biome if configured, otherwise ESLint `--fix` and Prettier if configured, otherwise a `format` script | `check`/`lint` script (or Biome/ESLint on changed files), `typecheck` script or `tsc --noEmit` (`nuxi typecheck` or `vue-tsc --noEmit` for Vue), related tests: `vitest related` or `jest --findRelatedTests`, otherwise the `test` script |
 | Turborepo / Nx | as above per package | lint and typecheck through `turbo --filter=...[HEAD]` or `nx affected --uncommitted`; related tests per package |
 | Gradle (Kotlin, Android) | `spotlessApply` or `ktlintFormat` if configured | `./gradlew check` |
 | Python | Ruff | Ruff, mypy/pyright if configured, pytest |
 | Go | gofmt on changed files | `go vet` and `go test` on changed packages |
 | Rust | `cargo fmt` | clippy `-D warnings`, `cargo test` |
 
-The package manager comes from the lockfile (pnpm by default).
+The package manager comes from the lockfile (pnpm by default). Feature-Sliced Design's `steiger` runs through a `lint:fsd` script when it is installed, next to the boundary check (see Architecture).
 
 See exactly what it would run in a repo:
 
@@ -209,7 +225,7 @@ All keys are optional. `improve` is `fix` (default), `record` or `off`. `verify`
 node --test plugins/craft/tests/*.test.mjs
 ```
 
-The tests build small throwaway repos for each stack (pnpm, yarn, npm, Gradle, Python, monorepo), check stack detection (Expo, Gradle Kotlin and Java, Maven, Next, React, NestJS, plain Node, an Expo app with `android/`, a monorepo), and cover the commit guard and the backlog parser. CI runs them on every push. Evals live in `plugins/craft/evals` (see Evals above).
+The tests build small throwaway repos for each stack (pnpm, yarn, npm, Gradle, Python, monorepo), check stack detection (Expo, Gradle Kotlin and Java, Maven, Next, React, TanStack, Nuxt and Vue, Angular, NestJS, plain Node, an Expo app with `android/`, a monorepo) and the add-on packs, the verify commands per package manager and stack, the layout thresholds, route-file and controller checks and `signals`, the commit guard and the backlog parser. CI runs them on every push. Evals live in `plugins/craft/evals` (see Evals above).
 
 ## Turn off Claude Code's own commit attribution
 

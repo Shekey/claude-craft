@@ -86,3 +86,10 @@ test("verify:false and CRAFT_VERIFY=off disable checks", () => {
 test("nothing changed means nothing to run", () => {
   assert.deepEqual(plan(makeRepo({}, {})), []);
 });
+
+test("vue and nuxt apps type-check their .vue files", () => {
+  const vue = makeRepo({ "package.json": { devDependencies: { vue: "3", "vue-tsc": "3" } }, "pnpm-lock.yaml": "", "tsconfig.json": "{}", "src/App.vue": "<template><div /></template>\n" });
+  assert.ok(commands(plan(vue), "check").includes("pnpm exec vue-tsc --noEmit"));
+  const nuxt = makeRepo({ "package.json": { dependencies: { nuxt: "4" } }, "pnpm-lock.yaml": "", "tsconfig.json": "{}", "pages/index.vue": "<template><div /></template>\n" });
+  assert.ok(commands(plan(nuxt), "check").includes("pnpm exec nuxi typecheck"));
+});

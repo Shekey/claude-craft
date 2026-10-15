@@ -132,3 +132,148 @@ test("signals checks the changed files and names each reason", () => {
   assert.doesNotMatch(signals(repo), /plan\.tsx/);
   assert.match(signals(repo, "app/plan.tsx"), /^no flags in 1 file\(s\)$/m);
 });
+
+test("next pages are route files: a thin async page passes, a page building its screen is flagged", () => {
+  const files = {
+    "package.json": { dependencies: { next: "16", react: "19" } },
+    "app/items/[id]/page.tsx": `import { notFound } from "next/navigation";
+import { getItem } from "@/features/items/server";
+import { ItemScreen } from "@/features/items/ItemScreen";
+
+export const revalidate = 60;
+
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const item = await getItem(id);
+  if (!item) notFound();
+  return <ItemScreen item={item} />;
+}
+`,
+    "app/dashboard/page.tsx": `export default async function Dashboard() {
+  const rows = await fetch("https://api.example.com/rows").then((r) => r.json());
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <ul>{rows.map((r: { id: string; name: string }) => <li key={r.id}>{r.name}</li>)}</ul>
+    </main>
+  );
+}
+`,
+    "app/dashboard/layout.tsx": component("DashboardLayout", 90),
+    "app/components/Chart.tsx": component("Chart", 90),
+  };
+  const out = layout(makeRepo(files));
+  assert.match(out, /app\/dashboard\/page\.tsx\tflag · renders 4 elements$/m);
+  assert.doesNotMatch(out, /items\/\[id\]\/page\.tsx\tflag|layout\.tsx\tflag ·|Chart\.tsx\tflag ·/);
+  assert.match(out, /^screens in route files \(2\+\): 1 of 2 route files, 1 thin$/m);
+});
+
+test("tanstack router files: Route export and param hooks are thin, an inline page is flagged", () => {
+  const files = {
+    "package.json": { dependencies: { "@tanstack/react-router": "1", react: "19" } },
+    "src/routes/__root.tsx": component("Root", 90),
+    "src/routes/posts.$id.tsx": `import { createFileRoute } from "@tanstack/react-router";
+import { fetchPost } from "@/features/posts/api";
+import { PostScreen } from "@/features/posts/PostScreen";
+
+export const Route = createFileRoute("/posts/$id")({
+  loader: ({ params }) => fetchPost(params.id),
+  component: PostRoute,
+});
+
+function PostRoute() {
+  const post = Route.useLoaderData();
+  return <PostScreen post={post} />;
+}
+`,
+    "src/routes/settings.tsx": `import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+
+export const Route = createFileRoute("/settings")({ component: Settings });
+
+function Settings() {
+  const [dark, setDark] = useState(false);
+  return <button onClick={() => setDark(!dark)}>{dark ? "Dark" : "Light"}</button>;
+}
+`,
+    "src/routes/-components/Big.tsx": component("Big", 90),
+  };
+  const out = layout(makeRepo(files));
+  assert.match(out, /src\/routes\/settings\.tsx\tflag · calls useState$/m);
+  assert.doesNotMatch(out, /posts\.\$id\.tsx\tflag|__root\.tsx\tflag ·|Big\.tsx\tflag ·/);
+});
+
+test("nuxt pages are route files checked on their script and template", () => {
+  const files = {
+    "package.json": { dependencies: { nuxt: "4", vue: "3" } },
+    "pages/habits/[id].vue": `<script setup lang="ts">
+const route = useRoute();
+definePageMeta({ layout: "app" });
+</script>
+
+<template>
+  <HabitScreen :id="String(route.params.id)" />
+</template>
+`,
+    "pages/stats.vue": `<script setup lang="ts">
+const { data } = await useFetch("/api/stats");
+const best = computed(() => data.value?.items.filter((i) => i.done).length ?? 0);
+</script>
+
+<template>
+  <section>
+    <h1>Stats</h1>
+    <p>{{ best }} done</p>
+  </section>
+</template>
+`,
+  };
+  const out = layout(makeRepo(files));
+  assert.match(out, /pages\/stats\.vue\tflag · calls useFetch$/m);
+  assert.doesNotMatch(out, /habits\/\[id\]\.vue\tflag/);
+});
+
+test("nest controllers with direct ORM access are flagged, controllers calling services are not", () => {
+  const repo = makeRepo({
+    "package.json": { dependencies: { "@nestjs/core": "11", "@nestjs/typeorm": "11" } },
+    "src/orders/orders.controller.ts": `import { Controller, Get } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Order } from "./order.entity";
+
+@Controller("orders")
+export class OrdersController {
+  constructor(@InjectRepository(Order) private readonly orders: Repository<Order>) {}
+
+  @Get()
+  list() {
+    return this.orders.find();
+  }
+}
+`,
+    "src/users/users.controller.ts": `import { Controller, Get } from "@nestjs/common";
+import { UsersService } from "./users.service";
+
+@Controller("users")
+export class UsersController {
+  constructor(private readonly users: UsersService) {}
+
+  @Get()
+  list() {
+    return this.users.list();
+  }
+}
+`,
+  });
+  const out = layout(repo);
+  assert.match(out, /^controllers and resolvers \(2; flag on direct ORM or database access\)$/m);
+  assert.match(out, /src\/orders\/orders\.controller\.ts\tflag · data access in controller: TypeORM$/m);
+  assert.doesNotMatch(out, /users\.controller\.ts\tflag/);
+  assert.match(signals(repo, "src/orders/orders.controller.ts"), /flag · data access in controller: TypeORM/);
+});
+
+test("angular files with several components are counted", () => {
+  const cmp = (name) => `@Component({ selector: "app-${name}", template: "<p>${name}</p>" })\nexport class ${name}Component {}\n${"const x = 1;\n".repeat(30)}`;
+  const out = layout(makeRepo({ "package.json": { dependencies: { "@angular/core": "20" } }, "src/app/settings.ts": ["A", "B", "C", "D", "E"].map(cmp).join("\n") }));
+  assert.match(out, /^\d+\t5\tsrc\/app\/settings\.ts\tflag$/m);
+});
