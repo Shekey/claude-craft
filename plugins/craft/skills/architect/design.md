@@ -86,10 +86,26 @@ If the units you read have no high or medium findings, say so plainly. Do not pa
 
 ## Stack signals
 
-Each stack pack in `${CLAUDE_PLUGIN_ROOT}/stacks/` lists its own design signals and fix shapes; read the pack for the code you are judging. Plain Node backends have no pack:
+**React / React Native**
+- D2: five or more `useState` calls for one form or entity; a function that calls most of the same setters as an effect.
+- D4: `useEffect` that calls setters from props or loaded data; `useRef` used as a "loaded once" guard.
+- D5: `ImagePicker`, `Permissions`, `fetch` or API client, `AsyncStorage`, `track(...)` called directly in a screen component.
+- D6: an expo-router or React Router route file defining the whole screen.
+- Fix shapes: `useXForm` returning the model and intent functions; a `useSaveX` mutation owning API, cache refresh and analytics.
+
+**Next.js**
+- D6: `page.tsx` or a route handler containing data mapping, validation and business rules.
+- D5: data fetched in client components with `useEffect` when a server component or server action fits; `"use client"` at the top of a large tree.
+- Fix shapes: fetch in server components or a query layer, push `"use client"` down to the interactive leaf, validate server action input with a schema at the boundary.
 
 **Node backend**
 - D6: controllers or route handlers that contain business rules or SQL.
 - D5 and D1: services that read `req` or `res`, or that send email, write to the database and call third parties in one function.
 - D8: shared `utils` holding order or billing rules.
 - Fix shapes: handler parses and validates, a use case per operation, repositories own persistence, external systems behind a port only when they need faking or swapping.
+
+**Kotlin / Android**
+- D2 and D3: a ViewModel exposing several `StateFlow`s or `mutableStateOf` fields for one screen instead of one `UiState`; loading, error and content flags instead of a sealed interface.
+- D5: `Context`, Retrofit or Room calls in a Composable or an Activity; ViewModel holding Android framework references.
+- D6: an Activity or Fragment with business logic.
+- Fix shapes: one `UiState` data class or sealed interface, a stateless screen Composable with hoisted state, repositories behind the ViewModel, side effects in `LaunchedEffect` only for UI events.
